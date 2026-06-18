@@ -469,12 +469,12 @@
               <span class="dl-size">~85 МБ</span>
               <span class="dl-format">.exe installer</span>
             </div>
-            <button class="dl-btn primary" onclick="downloadFile('win32')">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <button class="btn-download-hero" id="hero-download-btn" onclick="detectAndDownload()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 16l-6-6h4V4h4v6h4l-6 6z"/>
                 <rect x="4" y="18" width="16" height="2" rx="1"/>
               </svg>
-              Скачать .exe
+              <span id="hero-btn-text">Скачать для Windows</span>
             </button>
             <div class="dl-extra">
               <a href="#" onclick="downloadFile('win32-portable'); return false">Портативная версия</a>
