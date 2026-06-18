@@ -7,8 +7,9 @@ const https = require('https');
 const { pipeline } = require('stream');
 const { promisify } = require('util');
 const streamPipeline = promisify(pipeline);
+const axios = require('axios'); // <-- добавлено для запросов
 
-// ─── Попытка подключить дополнительные модули ────
+// Попытка подключить дополнительные модули (опционально)
 let AdmZip, tar, glob;
 try {
   AdmZip = require('adm-zip');
@@ -20,14 +21,12 @@ try {
   glob = require('glob');
 } catch (e) { glob = null; }
 
+// AutoUpdater
 let autoUpdater;
 let log;
-
-// Подключаем updater только в продакшне
 try {
   autoUpdater = require('electron-updater').autoUpdater;
   log = require('electron-log');
-
   log.transports.file.level = 'info';
   autoUpdater.logger = log;
   autoUpdater.autoDownload = false;
@@ -37,7 +36,6 @@ try {
 }
 
 const { launchMinecraft, getMinecraftPath } = require('./minecraft/launcher');
-
 const store = new Store();
 
 let mainWindow;
@@ -46,14 +44,10 @@ let splashWindow;
 // ─── Splash ───────────────────────────────────────
 function createSplash() {
   splashWindow = new BrowserWindow({
-    width:       400,
-    height:      250,
-    frame:       false,
-    transparent: true,
-    resizable:   false,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    center:      true,
+    width: 400, height: 250,
+    frame: false, transparent: true,
+    resizable: false, alwaysOnTop: true,
+    skipTaskbar: true, center: true,
     webPreferences: { nodeIntegration: false },
     backgroundColor: '#00000000',
   });
@@ -63,22 +57,21 @@ function createSplash() {
 // ─── Main Window ──────────────────────────────────
 function createMainWindow() {
   mainWindow = new BrowserWindow({
-    width:     1100,
-    height:    680,
-    minWidth:  900,
-    minHeight: 600,
-    frame:     false,
-    show:      false,
-    center:    true,
+    width: 1100, height: 680,
+    minWidth: 900, minHeight: 600,
+    frame: false, show: false, center: true,
     backgroundColor: '#0d0a1a',
     webPreferences: {
-      nodeIntegration:  true,
+      nodeIntegration: true,
       contextIsolation: false,
     },
     icon: path.join(__dirname, '../assets/icon.png'),
   });
 
   mainWindow.loadFile(path.join(__dirname, 'renderer/index.html'));
+
+  // Открываем DevTools для отладки (можно закомментировать)
+  mainWindow.webContents.openDevTools({ mode: 'detach' });
 
   mainWindow.once('ready-to-show', () => {
     setTimeout(() => {
@@ -88,7 +81,6 @@ function createMainWindow() {
       }
       mainWindow.show();
       mainWindow.focus();
-
       if (app.isPackaged && autoUpdater) {
         setTimeout(() => checkForUpdates(), 4000);
       }
@@ -106,44 +98,37 @@ function checkForUpdates() {
   });
 }
 
-// ─── AutoUpdater события ──────────────────────────
 function setupUpdaterEvents() {
   if (!autoUpdater) return;
-
   autoUpdater.on('update-available', (info) => {
     mainWindow?.webContents.send('update-available', {
       version: info.version,
-      notes:   info.releaseNotes || '',
-      date:    info.releaseDate,
+      notes: info.releaseNotes || '',
+      date: info.releaseDate,
     });
   });
-
   autoUpdater.on('update-not-available', () => {
     mainWindow?.webContents.send('update-not-available');
   });
-
   autoUpdater.on('download-progress', (progress) => {
     mainWindow?.webContents.send('update-download-progress', {
       percent: Math.round(progress.percent),
-      speed:   progress.bytesPerSecond,
-      total:   progress.total,
-      loaded:  progress.transferred,
+      speed: progress.bytesPerSecond,
+      total: progress.total,
+      loaded: progress.transferred,
     });
   });
-
   autoUpdater.on('update-downloaded', (info) => {
     mainWindow?.webContents.send('update-downloaded', {
       version: info.version,
     });
   });
-
   autoUpdater.on('error', (err) => {
     console.error('AutoUpdater error:', err);
     mainWindow?.webContents.send('update-error', err.message);
   });
 }
 
-// ─── App Ready ────────────────────────────────────
 app.whenReady().then(() => {
   setupUpdaterEvents();
   createSplash();
@@ -185,7 +170,6 @@ ipcMain.handle('launch-minecraft', async (_, options) => {
 ipcMain.on('open-minecraft-folder', () => {
   shell.openPath(getMinecraftPath());
 });
-
 ipcMain.handle('get-minecraft-path', () => getMinecraftPath());
 
 // ─── IPC — Обновления ─────────────────────────────
@@ -198,18 +182,12 @@ ipcMain.handle('update-download', async () => {
     return { success: false, error: err.message };
   }
 });
-
 ipcMain.on('update-install', () => {
   autoUpdater?.quitAndInstall(false, true);
 });
-
 ipcMain.handle('check-updates-manual', async () => {
-  if (!app.isPackaged) {
-    return { success: false, error: 'Dev режим — обновления недоступны' };
-  }
-  if (!autoUpdater) {
-    return { success: false, error: 'Updater недоступен' };
-  }
+  if (!app.isPackaged) return { success: false, error: 'Dev режим — обновления недоступны' };
+  if (!autoUpdater) return { success: false, error: 'Updater недоступен' };
   try {
     const result = await autoUpdater.checkForUpdates();
     return { success: true, updateInfo: result?.updateInfo };
@@ -217,15 +195,14 @@ ipcMain.handle('check-updates-manual', async () => {
     return { success: false, error: err.message };
   }
 });
-
 ipcMain.handle('get-app-version', () => app.getVersion());
 
 // ─── IPC — Java (ручной выбор) ──────────────────
 ipcMain.handle('browse-java', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
-    title:      'Выберите java.exe',
+    title: 'Выберите java.exe',
     properties: ['openFile'],
-    filters:    [{ name: 'Java', extensions: ['exe', ''] }]
+    filters: [{ name: 'Java', extensions: ['exe', ''] }]
   });
   if (!result.canceled && result.filePaths.length > 0) {
     return result.filePaths[0];
@@ -233,50 +210,16 @@ ipcMain.handle('browse-java', async () => {
   return null;
 });
 
-// ─── IPC — Загрузчики ─────────────────────────────
-ipcMain.handle('get-forge-versions', async (_, mcVersion) => {
-  try {
-    // Используем API Forge для получения списка версий
-    const url = `https://files.minecraftforge.net/maven/net/minecraftforge/forge/index_${mcVersion}.json`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Не удалось получить версии Forge');
-    const data = await response.json();
-    const versions = data.number || [];
-    return versions.map(v => ({ version: v, url: `https://files.minecraftforge.net/maven/net/minecraftforge/forge/${mcVersion}-${v}/forge-${mcVersion}-${v}-installer.jar` }));
-  } catch (e) {
-    console.error('Ошибка получения версий Forge:', e);
-    return [];
-  }
-});
-
-ipcMain.handle('get-fabric-versions', async (_, mcVersion) => {
-  try {
-    // Используем Fabric Meta API
-    const url = `https://meta.fabricmc.net/v2/versions/loader/${mcVersion}`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error('Не удалось получить версии Fabric');
-    const data = await response.json();
-    return data.map(item => ({ version: item.loader.version }));
-  } catch (e) {
-    console.error('Ошибка получения версий Fabric:', e);
-    return [];
-  }
-});
-
 // ═══════════════════════════════════════════════════
-// НОВЫЙ JAVA МЕНЕДЖЕР
+// JAVA МЕНЕДЖЕР
 // ═══════════════════════════════════════════════════
 
 function findJavaVersions() {
   return new Promise((resolve) => {
     let cmd;
-    if (process.platform === 'win32') {
-      cmd = 'where java';
-    } else if (process.platform === 'darwin') {
-      cmd = '/usr/libexec/java_home -V 2>&1 || which java';
-    } else {
-      cmd = 'which java || update-alternatives --list java 2>/dev/null || echo ""';
-    }
+    if (process.platform === 'win32') cmd = 'where java';
+    else if (process.platform === 'darwin') cmd = '/usr/libexec/java_home -V 2>&1 || which java';
+    else cmd = 'which java || update-alternatives --list java 2>/dev/null || echo ""';
 
     exec(cmd, (error, stdout, stderr) => {
       let paths = [];
@@ -310,7 +253,6 @@ function findJavaVersions() {
         paths = raw.split('\n')
           .filter(line => line.trim() && fs.existsSync(line.trim()))
           .map(line => line.trim());
-
         if (paths.length === 0 && glob) {
           const defaultPaths = [];
           if (process.platform === 'win32') {
@@ -333,11 +275,7 @@ function findJavaVersions() {
           }
         }
       }
-
-      if (paths.length === 0) {
-        resolve([]);
-        return;
-      }
+      if (paths.length === 0) return resolve([]);
 
       const results = [];
       let pending = paths.length;
@@ -356,19 +294,14 @@ function getJavaVersion(javaPath, callback) {
     const output = stderr || stdout;
     const match = output.match(/version "(\d+\.\d+\.\d+[^"]*?)"/) ||
                   output.match(/version "(\d+)"/);
-    if (match) {
-      callback(match[1]);
-    } else {
-      callback(null);
-    }
+    callback(match ? match[1] : null);
   });
 }
 
 async function downloadJava(version, destDir) {
   if (!AdmZip || !tar) {
-    throw new Error('Для скачивания Java необходимы библиотеки adm-zip и tar. Установите их: npm install adm-zip tar');
+    throw new Error('Для скачивания Java необходимы библиотеки adm-zip и tar. Установите: npm install adm-zip tar');
   }
-
   const platform = process.platform === 'win32' ? 'windows' : 
                    process.platform === 'darwin' ? 'mac' : 'linux';
   const arch = process.arch === 'x64' ? 'x64' : 'x86';
@@ -380,7 +313,6 @@ async function downloadJava(version, destDir) {
 
   if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
 
-  // Скачиваем
   await new Promise((resolve, reject) => {
     const file = fs.createWriteStream(destFile);
     https.get(url, (response) => {
@@ -388,13 +320,10 @@ async function downloadJava(version, destDir) {
         reject(new Error(`Ошибка загрузки: ${response.statusCode}`));
         return;
       }
-      streamPipeline(response, file)
-        .then(resolve)
-        .catch(reject);
+      streamPipeline(response, file).then(resolve).catch(reject);
     }).on('error', reject);
   });
 
-  // Распаковываем
   if (process.platform === 'win32') {
     const zip = new AdmZip(destFile);
     zip.extractAllTo(extractDir, true);
@@ -405,21 +334,15 @@ async function downloadJava(version, destDir) {
       strip: 1,
     });
   }
-
   const binPath = process.platform === 'win32' 
     ? path.join(extractDir, 'bin', 'java.exe')
     : path.join(extractDir, 'bin', 'java');
   return binPath;
 }
 
-// IPC — Java
 ipcMain.handle('find-java', async () => {
-  try {
-    return await findJavaVersions();
-  } catch (e) {
-    console.error('Ошибка поиска Java:', e);
-    return [];
-  }
+  try { return await findJavaVersions(); } 
+  catch (e) { console.error('Ошибка поиска Java:', e); return []; }
 });
 
 ipcMain.handle('download-java', async (_, version, destDir) => {
@@ -432,7 +355,36 @@ ipcMain.handle('download-java', async (_, version, destDir) => {
 });
 
 // ═══════════════════════════════════════════════════
-// НОВЫЙ МЕНЕДЖЕР МОДОВ
+// ЗАГРУЗЧИКИ (Forge, Fabric) — используем axios
+// ═══════════════════════════════════════════════════
+
+ipcMain.handle('get-forge-versions', async (_, mcVersion) => {
+  try {
+    const url = `https://files.minecraftforge.net/maven/net/minecraftforge/forge/index_${mcVersion}.json`;
+    const response = await axios.get(url, { timeout: 10000 });
+    const data = response.data;
+    const versions = data.number || [];
+    return versions.map(v => ({ version: v }));
+  } catch (e) {
+    console.error('Ошибка получения версий Forge:', e);
+    return [];
+  }
+});
+
+ipcMain.handle('get-fabric-versions', async (_, mcVersion) => {
+  try {
+    const url = `https://meta.fabricmc.net/v2/versions/loader/${mcVersion}`;
+    const response = await axios.get(url, { timeout: 10000 });
+    const data = response.data;
+    return data.map(item => ({ version: item.loader.version }));
+  } catch (e) {
+    console.error('Ошибка получения версий Fabric:', e);
+    return [];
+  }
+});
+
+// ═══════════════════════════════════════════════════
+// МЕНЕДЖЕР МОДОВ
 // ═══════════════════════════════════════════════════
 
 ipcMain.handle('mods-list-installed', async () => {
@@ -454,10 +406,18 @@ ipcMain.handle('mods-install', async (_, modId, version, downloadUrl) => {
 
   const filename = `${modId}-${version}.jar`;
   const dest = path.join(modsDir, filename);
-  const response = await fetch(downloadUrl);
-  if (!response.ok) throw new Error(`Ошибка загрузки: ${response.status}`);
-  const buffer = await response.arrayBuffer();
-  fs.writeFileSync(dest, Buffer.from(buffer));
+  const response = await axios({
+    method: 'GET',
+    url: downloadUrl,
+    responseType: 'stream',
+    timeout: 30000,
+  });
+  const writer = fs.createWriteStream(dest);
+  response.data.pipe(writer);
+  await new Promise((resolve, reject) => {
+    writer.on('finish', resolve);
+    writer.on('error', reject);
+  });
   return { success: true, path: dest };
 });
 

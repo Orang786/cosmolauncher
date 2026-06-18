@@ -22,11 +22,6 @@ function getMinecraftPath() {
 
 // ─── Установка Forge ──────────────────────────────
 async function installForge(minecraftPath, version, loaderVersion, onLog) {
-  // Используем встроенную функцию клиента
-  // Но minecraft-launcher-core не имеет прямого метода установки Forge, кроме как через запуск.
-  // Можно воспользоваться сторонней библиотекой или скачать installer и запустить.
-  // Для простоты используем подход: скачиваем installer и запускаем в режиме --installClient
-
   const forgeVersion = `${version}-${loaderVersion}`;
   const installerUrl = `https://files.minecraftforge.net/maven/net/minecraftforge/forge/${forgeVersion}/forge-${forgeVersion}-installer.jar`;
   const installerPath = path.join(minecraftPath, 'forge-installer.jar');
@@ -42,6 +37,7 @@ async function installForge(minecraftPath, version, loaderVersion, onLog) {
     method: 'GET',
     url: installerUrl,
     responseType: 'stream',
+    timeout: 60000,
   });
   const writer = fs.createWriteStream(installerPath);
   response.data.pipe(writer);
@@ -51,21 +47,18 @@ async function installForge(minecraftPath, version, loaderVersion, onLog) {
   });
 
   onLog && onLog({ type: 'info', message: 'Устанавливаем Forge...' });
-  // Запускаем installer в режиме --installClient
-  const java = process.platform === 'win32' ? 'java' : 'java'; // предполагаем, что Java доступна
+  const java = process.platform === 'win32' ? 'java' : 'java';
   const cmd = `"${java}" -jar "${installerPath}" --installClient "${minecraftPath}"`;
   const { stdout, stderr } = await execPromise(cmd);
   if (stderr) onLog && onLog({ type: 'error', message: stderr });
-  onLog && onLog({ type: 'info', message: stdout });
+  onLog && onLog({ type: 'info', message: stdout || 'Forge установлен' });
 
-  // Удаляем installer
   fs.unlinkSync(installerPath);
   return `forge-${forgeVersion}`;
 }
 
 // ─── Установка Fabric ─────────────────────────────
 async function installFabric(minecraftPath, version, loaderVersion, onLog) {
-  // Используем Fabric Installer API
   const installerUrl = 'https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.jar';
   const installerPath = path.join(minecraftPath, 'fabric-installer.jar');
   const fabricDir = path.join(minecraftPath, 'versions', `fabric-loader-${loaderVersion}-${version}`);
@@ -75,11 +68,12 @@ async function installFabric(minecraftPath, version, loaderVersion, onLog) {
     return `fabric-loader-${loaderVersion}-${version}`;
   }
 
-  onLog && onLog({ type: 'info', message: `Скачиваем Fabric Installer...` });
+  onLog && onLog({ type: 'info', message: 'Скачиваем Fabric Installer...' });
   const response = await axios({
     method: 'GET',
     url: installerUrl,
     responseType: 'stream',
+    timeout: 30000,
   });
   const writer = fs.createWriteStream(installerPath);
   response.data.pipe(writer);
@@ -93,22 +87,15 @@ async function installFabric(minecraftPath, version, loaderVersion, onLog) {
   const cmd = `"${java}" -jar "${installerPath}" client -dir "${minecraftPath}" -mcversion "${version}" -loader "${loaderVersion}"`;
   const { stdout, stderr } = await execPromise(cmd);
   if (stderr) onLog && onLog({ type: 'error', message: stderr });
-  onLog && onLog({ type: 'info', message: stdout });
+  onLog && onLog({ type: 'info', message: stdout || 'Fabric установлен' });
 
   fs.unlinkSync(installerPath);
   return `fabric-loader-${loaderVersion}-${version}`;
 }
 
-// ─── Установка OptiFine ────────────────────────────
+// ─── Установка OptiFine (в папку mods) ────────────
 async function installOptiFine(minecraftPath, version, optifineVersion, onLog) {
-  // Скачиваем OptiFine с зеркала (например, optifine.net)
-  // Формат: https://optifine.net/download.php?f=OptiFine_1.20.4_HD_U_I6.jar
   const optifineFile = `OptiFine_${version}_${optifineVersion}.jar`;
-  const downloadUrl = `https://optifine.net/download.php?f=${optifineFile}`;
-  const optifinePath = path.join(minecraftPath, 'mods', optifineFile); // или в папку версии?
-
-  // OptiFine может устанавливаться как мод (для Forge) или как отдельный профиль.
-  // Для простоты будем добавлять его в папку mods (для Forge).
   const modsDir = path.join(minecraftPath, 'mods');
   if (!fs.existsSync(modsDir)) fs.mkdirSync(modsDir, { recursive: true });
 
@@ -119,19 +106,15 @@ async function installOptiFine(minecraftPath, version, optifineVersion, onLog) {
   }
 
   onLog && onLog({ type: 'info', message: `Скачиваем OptiFine ${optifineVersion}...` });
-  // Примечание: optifine.net требует подтверждения, поэтому используем зеркало
-  // Вместо прямого скачивания можно использовать сторонний API
-  // Например: https://api.optifine.net/ или использовать зеркало
-  // Пока используем упрощённый вариант: просим пользователя скачать вручную
-  // Или используем библиотеку для парсинга страницы
-  // Для демонстрации сгенерируем ссылку на скачивание
+  // Используем зеркало (можно заменить на более стабильное)
   const mirrorUrl = `https://optifine.net/downloads/optifine/${optifineFile}`;
   try {
     const response = await axios({
       method: 'GET',
       url: mirrorUrl,
       responseType: 'stream',
-      headers: { 'User-Agent': 'Mozilla/5.0' }
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      timeout: 30000,
     });
     const writer = fs.createWriteStream(targetPath);
     response.data.pipe(writer);
@@ -156,45 +139,52 @@ async function launchMinecraft(options, onLog, onClose) {
     fs.mkdirSync(rootPath, { recursive: true });
   }
 
-  // Определяем реальную версию для запуска (может измениться после установки загрузчика)
   let actualVersion = version;
   let customArgs = options.customArgs || [];
 
-  // Установка загрузчиков
-  if (loader && loader !== 'vanilla') {
-    if (loader === 'forge' || loader === 'forge+optifine') {
-      const forgeVersion = await installForge(rootPath, version, loaderVersion || 'latest', onLog);
-      actualVersion = forgeVersion; // например, forge-1.20.4-47.2.0
-    } else if (loader === 'fabric' || loader === 'fabric+optifine') {
-      const fabricVersion = await installFabric(rootPath, version, loaderVersion || 'latest', onLog);
-      actualVersion = fabricVersion; // например, fabric-loader-0.15.11-1.20.4
-    }
+  try {
+    // Установка загрузчиков
+    if (loader && loader !== 'vanilla') {
+      if (loader === 'forge' || loader === 'forge+optifine') {
+        const forgeVersion = await installForge(rootPath, version, loaderVersion || 'latest', onLog);
+        actualVersion = forgeVersion;
+      } else if (loader === 'fabric' || loader === 'fabric+optifine') {
+        const fabricVersion = await installFabric(rootPath, version, loaderVersion || 'latest', onLog);
+        actualVersion = fabricVersion;
+      }
 
-    // OptiFine для Forge ставится как мод (уже сделано в installOptiFine)
-    if (loader === 'forge+optifine' || loader === 'fabric+optifine') {
-      // Для Fabric нужен OptiFabric, но мы пока упростим
-      if (loader === 'fabric+optifine') {
-        // Скачаем OptiFabric как мод
-        const optifabricUrl = 'https://maven.terraformersmc.com/releases/net/terraformersmc/optifabric/1.13.24/optifabric-1.13.24.jar';
-        const modsDir = path.join(rootPath, 'mods');
-        if (!fs.existsSync(modsDir)) fs.mkdirSync(modsDir, { recursive: true });
-        const optifabricPath = path.join(modsDir, 'optifabric.jar');
-        if (!fs.existsSync(optifabricPath)) {
-          onLog && onLog({ type: 'info', message: 'Скачиваем OptiFabric...' });
-          const response = await axios({ method: 'GET', url: optifabricUrl, responseType: 'stream' });
-          const writer = fs.createWriteStream(optifabricPath);
-          response.data.pipe(writer);
-          await new Promise((resolve, reject) => {
-            writer.on('finish', resolve);
-            writer.on('error', reject);
-          });
+      // OptiFine
+      if (loader === 'forge+optifine' || loader === 'fabric+optifine') {
+        if (loader === 'fabric+optifine') {
+          // Скачиваем OptiFabric как мод
+          const optifabricUrl = 'https://maven.terraformersmc.com/releases/net/terraformersmc/optifabric/1.13.24/optifabric-1.13.24.jar';
+          const modsDir = path.join(rootPath, 'mods');
+          if (!fs.existsSync(modsDir)) fs.mkdirSync(modsDir, { recursive: true });
+          const optifabricPath = path.join(modsDir, 'optifabric.jar');
+          if (!fs.existsSync(optifabricPath)) {
+            onLog && onLog({ type: 'info', message: 'Скачиваем OptiFabric...' });
+            const response = await axios({
+              method: 'GET',
+              url: optifabricUrl,
+              responseType: 'stream',
+              timeout: 15000,
+            });
+            const writer = fs.createWriteStream(optifabricPath);
+            response.data.pipe(writer);
+            await new Promise((resolve, reject) => {
+              writer.on('finish', resolve);
+              writer.on('error', reject);
+            });
+          }
+        }
+        if (optifineVersion) {
+          await installOptiFine(rootPath, version, optifineVersion, onLog);
         }
       }
-      // Устанавливаем OptiFine (в mods)
-      if (optifineVersion) {
-        await installOptiFine(rootPath, version, optifineVersion, onLog);
-      }
     }
+  } catch (e) {
+    onLog && onLog({ type: 'error', message: 'Ошибка установки загрузчика: ' + e.message });
+    throw e;
   }
 
   // Авторизация
@@ -236,7 +226,6 @@ async function launchMinecraft(options, onLog, onClose) {
     ]
   };
 
-  // Добавляем аргументы от пользователя (можно будет добавить позже)
   if (customArgs.length) {
     launchOptions.customArgs = launchOptions.customArgs.concat(customArgs);
   }
