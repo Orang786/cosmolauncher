@@ -3,31 +3,14 @@ const express   = require('express');
 const mongoose  = require('mongoose');
 const cors      = require('cors');
 const rateLimit = require('express-rate-limit');
-const path      = require('path');
+const axios     = require('axios');
 
 const authRoutes = require('./routes/auth');
 
 const app = express();
 
 // ─── CORS ─────────────────────────────────────────
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:5500',
-  'http://127.0.0.1:5500',
-  'https://cosmolauncher.onrender.com',
-  'https://cosmolauncher.com'
-];
-
-app.use(cors({
-  origin: (origin, callback) => {
-    // Разрешаем запросы без origin (Electron app)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    callback(null, true); // В проде можно убрать и сделать строго
-  },
-  credentials: true
-}));
-
+app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -35,15 +18,12 @@ app.use(express.urlencoded({ extended: true }));
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 200,
-  standardHeaders: true,
-  legacyHeaders: false,
   message: { message: 'Слишком много запросов' }
 });
-
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
-  message: { message: 'Слишком много попыток входа' }
+  message: { message: 'Слишком много попыток' }
 });
 
 app.use('/api/', limiter);
@@ -53,73 +33,81 @@ app.use('/api/auth/register', authLimiter);
 // ─── Routes ───────────────────────────────────────
 app.use('/api/auth', authRoutes);
 
-// Версии Minecraft (для лаунчера и сайта)
-app.get('/api/versions', (req, res) => {
-  res.json({
-    versions: [
-      { id: '1.20.4', type: 'release', releaseTime: '2023-12-07', recommended: true },
-      { id: '1.20.2', type: 'release', releaseTime: '2023-10-17' },
-      { id: '1.20.1', type: 'release', releaseTime: '2023-06-12' },
-      { id: '1.19.4', type: 'release', releaseTime: '2023-03-14' },
-      { id: '1.19.2', type: 'release', releaseTime: '2022-08-05' },
-      { id: '1.18.2', type: 'release', releaseTime: '2022-02-28' },
-      { id: '1.17.1', type: 'release', releaseTime: '2021-07-06' },
-      { id: '1.16.5', type: 'release', releaseTime: '2021-01-15' },
-      { id: '1.15.2', type: 'release', releaseTime: '2020-01-21' },
-      { id: '1.12.2', type: 'release', releaseTime: '2017-09-18' },
-      { id: '1.8.9',  type: 'release', releaseTime: '2015-12-09' },
-      { id: '1.7.10', type: 'old_release', releaseTime: '2014-06-26' },
-      { id: '1.5.2',  type: 'old_release', releaseTime: '2013-05-02' },
-    ]
-  });
+// ─── Versions (кэш) ───────────────────────────────
+let versionsCache     = null;
+let versionsCacheTime = 0;
+const CACHE_TTL       = 10 * 60 * 1000;
+
+app.get('/api/versions', async (req, res) => {
+  try {
+    if (versionsCache && Date.now() - versionsCacheTime < CACHE_TTL) {
+      return res.json({ versions: versionsCache });
+    }
+
+    const response = await axios.get(
+      'https://launchermeta.mojang.com/mc/game/version_manifest.json',
+      { timeout: 8000 }
+    );
+
+    const data = response.data;
+
+    const versions = data.versions.map(v => ({
+      id:             v.id,
+      type:           v.type,
+      releaseTime:    v.releaseTime,
+      recommended:    v.id === data.latest.release,
+      latest:         v.id === data.latest.release,
+      latestSnapshot: v.id === data.latest.snapshot,
+    }));
+
+    versionsCache     = versions;
+    versionsCacheTime = Date.now();
+
+    res.json({ versions, latest: data.latest });
+
+  } catch (err) {
+    console.error('Ошибка загрузки версий:', err.message);
+    if (versionsCache) {
+      return res.json({ versions: versionsCache });
+    }
+    res.status(500).json({ message: 'Не удалось загрузить версии' });
+  }
 });
 
-// Информация о последней версии лаунчера (для авто-обновления)
+// ─── Launcher latest ──────────────────────────────
 app.get('/api/launcher/latest', (req, res) => {
   res.json({
     version: '1.0.0',
     downloads: {
-      win32:  `${process.env.SITE_URL || 'https://cosmolauncher.onrender.com'}/downloads/CosmoLauncher-Setup-1.0.0.exe`,
-      linux:  `${process.env.SITE_URL || 'https://cosmolauncher.onrender.com'}/downloads/CosmoLauncher-1.0.0.AppImage`,
-      darwin: `${process.env.SITE_URL || 'https://cosmolauncher.onrender.com'}/downloads/CosmoLauncher-1.0.0.dmg`
+      win32:  'https://github.com/Orang786/cosmolauncher/releases/download/NewUpdate/CosmoLauncher.Setup.1.0.0.exe',
+      linux:  'https://github.com/Orang786/cosmolauncher/releases/download/NewUpdate/CosmoLauncher.1.0.0.AppImage',
+      darwin: 'https://github.com/Orang786/cosmolauncher/releases/download/NewUpdate/CosmoLauncher.1.0.0.dmg'
     },
     changelog: [
       'Первый публичный релиз',
-      'Поддержка всех версий Minecraft',
-      'Система аккаунтов CosmoLauncher',
+      'Загрузка всех версий с Mojang API',
+      'Система аккаунтов',
       'Оффлайн режим'
     ]
   });
 });
 
-// Health check (Render проверяет этот endpoint)
+// ─── Health ───────────────────────────────────────
 app.get('/', (req, res) => {
-  res.json({
-    name: 'CosmoLauncher API',
-    version: '1.0.0',
-    status: 'running',
-    timestamp: new Date().toISOString()
-  });
+  res.json({ name: 'CosmoLauncher API', status: 'running' });
 });
 
 app.get('/api/health', (req, res) => {
   res.json({
-    status: 'ok',
-    db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    uptime: process.uptime(),
+    status:    'ok',
+    db:        mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    uptime:    process.uptime(),
     timestamp: new Date().toISOString()
   });
 });
 
-// 404
 app.use((req, res) => {
   res.status(404).json({ message: 'Не найдено' });
-});
-
-// Error handler
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Ошибка сервера' });
 });
 
 // ─── Start ────────────────────────────────────────
@@ -129,7 +117,7 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log('✅ MongoDB Atlas подключена');
     app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Сервер запущен на порту ${PORT}`);
+      console.log(`🚀 Сервер на порту ${PORT}`);
     });
   })
   .catch(err => {

@@ -1,9 +1,7 @@
 const { ipcRenderer } = require('electron');
 
-// ─── API URL ───────────────────────────────────────
 const API = 'https://cosmolauncher-api.onrender.com/api';
 
-// ─── State ────────────────────────────────────────
 let currentUser  = null;
 let isLaunching  = false;
 let allVersions  = [];
@@ -25,7 +23,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateUI();
 });
 
-// ─── Window Controls ──────────────────────────────
+// ─── Window ───────────────────────────────────────
 function initWindowControls() {
   document.getElementById('btn-minimize').onclick = () => ipcRenderer.send('window-minimize');
   document.getElementById('btn-maximize').onclick = () => ipcRenderer.send('window-maximize');
@@ -37,9 +35,8 @@ function initNavigation() {
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', () => switchPage(item.dataset.page));
   });
-  document.getElementById('sidebar-profile').addEventListener('click', () => {
-    switchPage('settings');
-  });
+  document.getElementById('sidebar-profile')
+    .addEventListener('click', () => switchPage('settings'));
 }
 
 function switchPage(name) {
@@ -52,7 +49,7 @@ function switchPage(name) {
 // ─── Versions ─────────────────────────────────────
 function getDefaultVersions() {
   return [
-    { id: '1.20.4', type: 'release',     recommended: true },
+    { id: '1.20.4', type: 'release',     recommended: true  },
     { id: '1.20.2', type: 'release' },
     { id: '1.20.1', type: 'release' },
     { id: '1.19.4', type: 'release' },
@@ -69,26 +66,48 @@ function getDefaultVersions() {
 }
 
 async function loadVersions() {
-  // Сразу ставим дефолтные чтобы не было пустоты
-  allVersions = getDefaultVersions();
+  showVersionsLoading();
+
+  try {
+    const res  = await fetch(
+      'https://launchermeta.mojang.com/mc/game/version_manifest.json',
+      { signal: AbortSignal.timeout(8000) }
+    );
+    const data = await res.json();
+
+    allVersions = data.versions.map(v => ({
+      id:             v.id,
+      type:           v.type,
+      releaseTime:    v.releaseTime,
+      recommended:    v.id === data.latest.release,
+      latest:         v.id === data.latest.release,
+      latestSnapshot: v.id === data.latest.snapshot,
+    }));
+
+    console.log(`✅ Загружено ${allVersions.length} версий с Mojang`);
+
+  } catch (err) {
+    console.log('Mojang API недоступен, используем дефолт');
+    allVersions = getDefaultVersions();
+  }
+
   populateVersionSelect();
   renderVersionsPage('release');
+}
 
-  // Пробуем загрузить с API
-  try {
-    const res  = await fetch(`${API}/versions`, {
-      signal: AbortSignal.timeout(5000)
-    });
-    const data = await res.json();
-    if (data.versions && data.versions.length > 0) {
-      allVersions = data.versions;
-      populateVersionSelect();
-      renderVersionsPage('release');
-    }
-  } catch {
-    // Остаёмся на дефолтных
-    console.log('API недоступен, используем дефолтные версии');
-  }
+function showVersionsLoading() {
+  const grid = document.getElementById('versions-grid');
+  if (!grid) return;
+  grid.innerHTML = `
+    <div style="
+      grid-column:1/-1;
+      display:flex;align-items:center;gap:12px;
+      padding:40px;color:var(--text-secondary);font-size:14px;
+    ">
+      <div class="spinner"></div>
+      Загрузка версий с серверов Mojang...
+    </div>
+  `;
 }
 
 function populateVersionSelect() {
@@ -98,53 +117,99 @@ function populateVersionSelect() {
     .filter(v => v.type === 'release')
     .map(v => `
       <option value="${v.id}">
-        ${v.id}${v.recommended ? ' (Рекомендуется)' : ''}
+        ${v.id}${v.recommended ? ' ⭐' : ''}
       </option>
     `).join('');
 }
 
-// ─── Versions Page ────────────────────────────────
 function initVersionsPage() {
   document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.filter-btn')
+        .forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      renderVersionsPage(btn.dataset.filter);
+      const search = document.getElementById('version-search')?.value || '';
+      renderVersionsPage(btn.dataset.filter, search);
     });
+  });
+
+  document.getElementById('version-search')?.addEventListener('input', e => {
+    const active = document.querySelector('.filter-btn.active');
+    renderVersionsPage(active?.dataset.filter || 'release', e.target.value);
   });
 }
 
-function renderVersionsPage(filter) {
+function renderVersionsPage(filter, search = '') {
   const grid = document.getElementById('versions-grid');
   if (!grid) return;
 
-  let filtered = [];
+  let filtered = allVersions;
 
   if (filter === 'release') {
     filtered = allVersions.filter(v => v.type === 'release');
-  } else if (filter === 'old') {
-    filtered = allVersions.filter(v => v.type === 'old_release');
   } else if (filter === 'snapshot') {
     filtered = allVersions.filter(v => v.type === 'snapshot');
-  } else {
-    filtered = allVersions;
+  } else if (filter === 'old') {
+    filtered = allVersions.filter(v =>
+      v.type === 'old_beta' ||
+      v.type === 'old_alpha' ||
+      v.type === 'old_release'
+    );
   }
+
+  if (search.trim()) {
+    filtered = filtered.filter(v =>
+      v.id.toLowerCase().includes(search.toLowerCase())
+    );
+  }
+
+  const counter = document.getElementById('versions-count');
+  if (counter) counter.textContent = `Найдено: ${filtered.length} версий`;
 
   if (!filtered.length) {
     grid.innerHTML = `
-      <p style="color:var(--text-muted);padding:20px;grid-column:1/-1">
-        Нет версий в этой категории
-      </p>`;
+      <div style="
+        grid-column:1/-1;padding:40px;
+        text-align:center;color:var(--text-muted);
+      ">
+        ${search
+          ? `Версия "${search}" не найдена`
+          : 'Нет версий в этой категории'}
+      </div>
+    `;
     return;
   }
 
+  const typeLabels = {
+    'release':   'Release',
+    'snapshot':  'Snapshot',
+    'old_beta':  'Old Beta',
+    'old_alpha': 'Old Alpha',
+  };
+
+  const typeColors = {
+    'release':   'var(--accent-2)',
+    'snapshot':  '#f59e0b',
+    'old_beta':  '#6b7280',
+    'old_alpha': '#4b5563',
+  };
+
   grid.innerHTML = filtered.map(v => `
     <div class="version-card ${v.recommended ? 'recommended' : ''}">
+      ${v.recommended
+        ? '<div class="version-badge">⭐ Рекомендуется</div>'
+        : v.latestSnapshot
+        ? '<div class="version-badge snapshot">🔧 Latest Snapshot</div>'
+        : ''}
       <div class="version-number">${v.id}</div>
-      <div class="version-type">
-        ${v.type === 'release' ? 'Release' : 'Old Release'}
-        ${v.recommended
-          ? ' · <span style="color:var(--accent-2)">⭐ Рекомендуется</span>'
+      <div class="version-type" style="color:${typeColors[v.type] || 'var(--text-muted)'}">
+        ${typeLabels[v.type] || v.type}
+      </div>
+      <div class="version-date">
+        ${v.releaseTime
+          ? new Date(v.releaseTime).toLocaleDateString('ru-RU', {
+              day: '2-digit', month: 'short', year: 'numeric'
+            })
           : ''}
       </div>
       <div class="version-action">
@@ -162,15 +227,13 @@ window.launchVersion = function(version) {
   setTimeout(handleLaunch, 100);
 };
 
-// ─── Home Controls ────────────────────────────────
+// ─── Home ─────────────────────────────────────────
 function initHomeControls() {
   const slider  = document.getElementById('ram-slider');
   const display = document.getElementById('ram-display');
-  if (slider) {
-    slider.addEventListener('input', () => {
-      display.textContent = slider.value;
-    });
-  }
+  if (slider) slider.addEventListener('input', () => {
+    display.textContent = slider.value;
+  });
   document.getElementById('launch-btn')?.addEventListener('click', handleLaunch);
 }
 
@@ -187,7 +250,6 @@ async function handleLaunch() {
   const ram           = parseInt(document.getElementById('ram-slider').value);
   const fullscreen    = await ipcRenderer.invoke('store-get', 'fullscreen') || false;
   const javaPath      = await ipcRenderer.invoke('store-get', 'javaPath')   || 'java';
-  const closeOnLaunch = await ipcRenderer.invoke('store-get', 'closeLauncher') ?? true;
 
   isLaunching = true;
   setLaunchBtnState('loading');
@@ -202,7 +264,7 @@ async function handleLaunch() {
 
   if (!result.success) {
     showNotif('Ошибка: ' + result.error, 'error');
-    addLog('❌ Ошибка: ' + result.error, 'error');
+    addLog('❌ ' + result.error, 'error');
     isLaunching = false;
     setLaunchBtnState('idle');
     hideElement('download-progress');
@@ -242,12 +304,10 @@ async function askOfflineUsername() {
     const confirm = async () => {
       const val = input.value.trim();
       if (!val || val.length < 3) {
-        showNotif('Никнейм минимум 3 символа', 'error');
-        return;
+        showNotif('Никнейм минимум 3 символа', 'error'); return;
       }
       if (!/^[a-zA-Z0-9_]+$/.test(val)) {
-        showNotif('Только буквы, цифры и _', 'error');
-        return;
+        showNotif('Только буквы, цифры и _', 'error'); return;
       }
       await ipcRenderer.invoke('store-set', 'offlineUsername', val);
       modal.classList.remove('show');
@@ -271,8 +331,6 @@ function initConsole() {
     consoleLines = 0;
   });
 
-  // ── ПРОБЛЕМА 2 ИСПРАВЛЕНА ЗДЕСЬ ──
-  // Слушаем закрытие Minecraft и сбрасываем кнопку
   ipcRenderer.on('minecraft-log', (_, data) => {
     if (data.type === 'progress') {
       handleProgress(data.data);
@@ -282,7 +340,6 @@ function initConsole() {
   });
 
   ipcRenderer.on('minecraft-closed', (_, code) => {
-    // Сбрасываем состояние кнопки когда Minecraft закрылся
     isLaunching = false;
     setLaunchBtnState('idle');
     hideElement('download-progress');
@@ -291,16 +348,9 @@ function initConsole() {
       code === 0 ? 'success' : 'error'
     );
     showNotif(
-      code === 0 ? 'Minecraft закрыт' : `Minecraft закрыт с ошибкой (код: ${code})`,
+      code === 0 ? 'Minecraft закрыт' : `Ошибка (код: ${code})`,
       code === 0 ? 'info' : 'error'
     );
-  });
-
-  // Если Minecraft запустился успешно — ставим кнопку в режим "запущено"
-  ipcRenderer.on('minecraft-launched', () => {
-    setLaunchBtnState('launched');
-    addLog('✅ Minecraft запущен!', 'success');
-    showNotif('Minecraft запущен! 🎮', 'success');
   });
 }
 
@@ -310,7 +360,7 @@ function addLog(msg, type = '') {
     if (out) out.innerHTML = '';
     consoleLines = 0;
   }
-  const out  = document.getElementById('console-output');
+  const out = document.getElementById('console-output');
   if (!out) return;
   const line = document.createElement('div');
   line.className   = `console-line ${type}`;
@@ -353,25 +403,28 @@ function initAuth() {
       document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
       const isLogin = tab.dataset.tab === 'login';
-      document.getElementById('auth-form-login')?.classList.toggle('hidden', !isLogin);
-      document.getElementById('auth-form-register')?.classList.toggle('hidden', isLogin);
+      document.getElementById('auth-form-login')
+        ?.classList.toggle('hidden', !isLogin);
+      document.getElementById('auth-form-register')
+        ?.classList.toggle('hidden', isLogin);
     });
   });
 
-  document.getElementById('btn-login')?.addEventListener('click', handleLogin);
-  document.getElementById('btn-register')?.addEventListener('click', handleRegister);
-  document.getElementById('btn-logout')?.addEventListener('click', handleLogout);
+  document.getElementById('btn-login')
+    ?.addEventListener('click', handleLogin);
+  document.getElementById('btn-register')
+    ?.addEventListener('click', handleRegister);
+  document.getElementById('btn-logout')
+    ?.addEventListener('click', handleLogout);
 
   document.getElementById('btn-offline')?.addEventListener('click', async () => {
-    // Сбросить сохранённый ник чтобы показалось окно
     await ipcRenderer.invoke('store-delete', 'offlineUsername');
     const uname = await askOfflineUsername();
     if (uname) {
       currentUser = { username: uname, offline: true };
-      // ── ПРОБЛЕМА 3 ИСПРАВЛЕНА — сохраняем offline пользователя ──
       await ipcRenderer.invoke('store-set', 'offlineUser', JSON.stringify(currentUser));
       updateUI();
-      showNotif(`Привет, ${uname}! Оффлайн режим 🎮`, 'success');
+      showNotif(`Привет, ${uname}! 🎮`, 'success');
       switchPage('home');
     }
   });
@@ -380,7 +433,9 @@ function initAuth() {
 async function handleLogin() {
   const email    = document.getElementById('login-email')?.value.trim();
   const password = document.getElementById('login-password')?.value;
-  if (!email || !password) { showNotif('Заполните все поля', 'error'); return; }
+  if (!email || !password) {
+    showNotif('Заполните все поля', 'error'); return;
+  }
 
   const btn = document.getElementById('btn-login');
   setBtn(btn, 'Вхожу...', true);
@@ -395,12 +450,10 @@ async function handleLogin() {
     const data = await res.json();
 
     if (!res.ok) {
-      showNotif(data.message || 'Ошибка входа', 'error');
-      return;
+      showNotif(data.message || 'Ошибка входа', 'error'); return;
     }
 
     currentUser = data.user;
-    // ── ПРОБЛЕМА 3 ИСПРАВЛЕНА — сохраняем токен и данные ──
     await ipcRenderer.invoke('store-set', 'token', data.token);
     await ipcRenderer.invoke('store-set', 'user', JSON.stringify(data.user));
     await ipcRenderer.invoke('store-delete', 'offlineUser');
@@ -410,8 +463,8 @@ async function handleLogin() {
     showNotif(`Добро пожаловать, ${data.user.username}! 🎮`, 'success');
     switchPage('home');
 
-  } catch (err) {
-    showNotif('Сервер недоступен. Попробуйте позже.', 'error');
+  } catch {
+    showNotif('Сервер недоступен', 'error');
   } finally {
     setBtn(btn, 'Войти в аккаунт', false);
   }
@@ -433,7 +486,7 @@ async function handleRegister() {
     showNotif('Пароль минимум 8 символов', 'error'); return;
   }
   if (!/^[a-zA-Z0-9_]{3,16}$/.test(username)) {
-    showNotif('Никнейм: 3-16 символов, буквы/цифры/_', 'error'); return;
+    showNotif('Никнейм: 3-16 символов', 'error'); return;
   }
 
   const btn = document.getElementById('btn-register');
@@ -449,22 +502,20 @@ async function handleRegister() {
     const data = await res.json();
 
     if (!res.ok) {
-      showNotif(data.message || 'Ошибка регистрации', 'error');
-      return;
+      showNotif(data.message || 'Ошибка', 'error'); return;
     }
 
     currentUser = data.user;
-    // ── ПРОБЛЕМА 3 ИСПРАВЛЕНА — сохраняем сессию ──
     await ipcRenderer.invoke('store-set', 'token', data.token);
     await ipcRenderer.invoke('store-set', 'user', JSON.stringify(data.user));
     await ipcRenderer.invoke('store-delete', 'offlineUser');
 
     updateUI();
-    showNotif(`Аккаунт создан! Добро пожаловать, ${username}! 🎉`, 'success');
+    showNotif(`Добро пожаловать, ${username}! 🎉`, 'success');
     switchPage('home');
 
   } catch {
-    showNotif('Сервер недоступен. Попробуйте позже.', 'error');
+    showNotif('Сервер недоступен', 'error');
   } finally {
     setBtn(btn, 'Создать аккаунт', false);
   }
@@ -476,15 +527,14 @@ async function handleLogout() {
   await ipcRenderer.invoke('store-delete', 'user');
   await ipcRenderer.invoke('store-delete', 'offlineUser');
   await ipcRenderer.invoke('store-delete', 'offlineUsername');
-  if (document.getElementById('login-email'))
-    document.getElementById('login-email').value    = '';
-  if (document.getElementById('login-password'))
-    document.getElementById('login-password').value = '';
+  const loginEmail    = document.getElementById('login-email');
+  const loginPassword = document.getElementById('login-password');
+  if (loginEmail)    loginEmail.value    = '';
+  if (loginPassword) loginPassword.value = '';
   updateUI();
   showNotif('Вы вышли из аккаунта', 'info');
 }
 
-// ── ПРОБЛЕМА 3 ИСПРАВЛЕНА — правильное восстановление сессии ──
 async function restoreSession() {
   try {
     const token      = await ipcRenderer.invoke('store-get', 'token');
@@ -492,10 +542,8 @@ async function restoreSession() {
     const offlineStr = await ipcRenderer.invoke('store-get', 'offlineUser');
 
     if (token && userStr) {
-      // Есть аккаунт — восстанавливаем из кэша сразу
       currentUser = JSON.parse(userStr);
 
-      // Фоновая проверка токена
       fetch(`${API}/auth/me`, {
         headers: { 'Authorization': `Bearer ${token}` },
         signal:  AbortSignal.timeout(5000)
@@ -508,18 +556,13 @@ async function restoreSession() {
           updateUI();
         }
       })
-      .catch(() => {
-        // Токен устарел но кэш есть — всё равно показываем пользователя
-        console.log('Токен устарел, используем кэш');
-      });
+      .catch(() => {});
 
     } else if (offlineStr) {
-      // Оффлайн пользователь
       currentUser = JSON.parse(offlineStr);
     }
-
   } catch (e) {
-    console.log('Ошибка восстановления сессии:', e);
+    console.log('Ошибка сессии:', e);
   }
 }
 
@@ -531,7 +574,7 @@ function initSettings() {
     ipcRenderer.invoke('store-set', 'defaultRam', e.target.value);
     const slider = document.getElementById('ram-slider');
     const disp   = document.getElementById('ram-display');
-    if (slider) slider.value = e.target.value;
+    if (slider) slider.value    = e.target.value;
     if (disp)   disp.textContent = e.target.value;
   });
 
@@ -559,11 +602,12 @@ function initSettings() {
         signal: AbortSignal.timeout(5000)
       });
       const data = await res.json();
-      if (data.version === '1.0.0') {
-        showNotif('У вас последняя версия ✅', 'success');
-      } else {
-        showNotif(`Доступна версия ${data.version}!`, 'info');
-      }
+      showNotif(
+        data.version === '1.0.0'
+          ? 'У вас последняя версия ✅'
+          : `Доступна версия ${data.version}!`,
+        'success'
+      );
     } catch {
       showNotif('Не удалось проверить обновления', 'error');
     } finally {
@@ -582,9 +626,9 @@ async function loadSavedSettings() {
     const sel    = document.getElementById('default-ram');
     const slider = document.getElementById('ram-slider');
     const disp   = document.getElementById('ram-display');
-    if (sel)    sel.value          = ram;
-    if (slider) slider.value       = ram;
-    if (disp)   disp.textContent   = ram;
+    if (sel)    sel.value         = ram;
+    if (slider) slider.value      = ram;
+    if (disp)   disp.textContent  = ram;
   }
   if (java) {
     const el = document.getElementById('java-path');
@@ -598,26 +642,29 @@ async function loadSavedSettings() {
   if (closeEl) closeEl.checked = close ?? true;
 }
 
-// ─── News Page ────────────────────────────────────
+// ─── News ─────────────────────────────────────────
 function initNewsPage() {
   const newsData = [
     {
-      emoji: '🎮', color: 'linear-gradient(135deg,#7c3aed,#4f46e5)',
+      emoji: '🎮',
+      color: 'linear-gradient(135deg,#7c3aed,#4f46e5)',
       date:  '15 декабря 2024',
       title: 'CosmoLauncher 1.0 — релиз!',
-      text:  'Первый публичный релиз. Поддержка всех версий Minecraft от 1.5 до 1.20.4.'
+      text:  'Первый публичный релиз. Поддержка всех версий Minecraft.'
     },
     {
-      emoji: '⚡', color: 'linear-gradient(135deg,#a855f7,#7c3aed)',
+      emoji: '⚡',
+      color: 'linear-gradient(135deg,#a855f7,#7c3aed)',
       date:  '10 декабря 2024',
       title: 'Оптимизация производительности',
-      text:  'Встроенные JVM аргументы дают до +30% FPS без ручных настроек.'
+      text:  'Встроенные JVM аргументы дают до +30% FPS.'
     },
     {
-      emoji: '🔐', color: 'linear-gradient(135deg,#4f46e5,#2563eb)',
+      emoji: '🔐',
+      color: 'linear-gradient(135deg,#4f46e5,#2563eb)',
       date:  '5 декабря 2024',
       title: 'Система аккаунтов',
-      text:  'Теперь можно создать аккаунт CosmoLauncher и сохранять настройки.'
+      text:  'Создай аккаунт CosmoLauncher и сохраняй настройки.'
     },
   ];
 
@@ -633,7 +680,7 @@ function initNewsPage() {
         <div class="news-date">${n.date}</div>
         <h3>${n.title}</h3>
         <p>${n.text}</p>
-        <button class="btn-link">Читать подробнее →</button>
+        <button class="btn-link">Читать →</button>
       </div>
     </div>
   `).join('');
@@ -641,7 +688,7 @@ function initNewsPage() {
 
 // ─── Update UI ────────────────────────────────────
 function updateUI() {
-  const logged = !!currentUser;
+  const logged    = !!currentUser;
   const loggedOut = document.getElementById('auth-logged-out');
   const loggedIn  = document.getElementById('auth-logged-in');
 
@@ -649,7 +696,6 @@ function updateUI() {
   if (loggedIn)  loggedIn.style.display  = logged ? 'block' : 'none';
 
   const letter = logged ? currentUser.username[0].toUpperCase() : '?';
-
   const els = {
     'profile-avatar':     letter,
     'profile-name':       logged ? currentUser.username : 'Не войдено',
@@ -686,7 +732,7 @@ function hideElement(id) {
 function showNotif(msg, type = 'info') {
   const c = document.getElementById('notifications');
   if (!c) return;
-  const n = document.createElement('div');
+  const n       = document.createElement('div');
   n.className   = `notification ${type}`;
   n.textContent = msg;
   c.appendChild(n);
