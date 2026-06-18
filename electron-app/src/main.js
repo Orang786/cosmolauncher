@@ -1,21 +1,30 @@
 const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
-const path    = require('path');
-const Store   = require('electron-store');
-const { autoUpdater } = require('electron-updater');
+const path  = require('path');
+const Store = require('electron-store');
+
+let autoUpdater;
+let log;
+
+// Подключаем updater только в продакшне
+try {
+  autoUpdater = require('electron-updater').autoUpdater;
+  log = require('electron-log');
+
+  // ── Правильная настройка логов ──
+  log.transports.file.level = 'info';
+  autoUpdater.logger = log;
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+} catch (e) {
+  console.log('electron-updater не найден:', e.message);
+}
+
 const { launchMinecraft, getMinecraftPath } = require('./minecraft/launcher');
 
 const store = new Store();
 
 let mainWindow;
 let splashWindow;
-
-// ─── AutoUpdater настройка ────────────────────────
-autoUpdater.autoDownload    = false; // Качаем только когда игрок согласился
-autoUpdater.autoInstallOnAppQuit = true;
-
-// Логи обновлений
-autoUpdater.logger = require('electron-log');
-autoUpdater.logger.transports.fileLog.level = 'info';
 
 // ─── Splash ───────────────────────────────────────
 function createSplash() {
@@ -63,8 +72,10 @@ function createMainWindow() {
       mainWindow.show();
       mainWindow.focus();
 
-      // Проверить обновления через 3 секунды после запуска
-      setTimeout(() => checkForUpdates(), 3000);
+      // Проверить обновления через 4 секунды
+      if (app.isPackaged && autoUpdater) {
+        setTimeout(() => checkForUpdates(), 4000);
+      }
     }, 2500);
   });
 
@@ -73,56 +84,52 @@ function createMainWindow() {
 
 // ─── Проверка обновлений ──────────────────────────
 function checkForUpdates() {
-  // Только в продакшне
-  if (!app.isPackaged) {
-    console.log('Dev режим — пропускаем проверку обновлений');
-    return;
-  }
+  if (!autoUpdater) return;
   autoUpdater.checkForUpdates().catch(err => {
     console.log('Ошибка проверки обновлений:', err.message);
   });
 }
 
 // ─── AutoUpdater события ──────────────────────────
+function setupUpdaterEvents() {
+  if (!autoUpdater) return;
 
-// Найдено обновление
-autoUpdater.on('update-available', (info) => {
-  mainWindow?.webContents.send('update-available', {
-    version:  info.version,
-    notes:    info.releaseNotes || '',
-    date:     info.releaseDate,
+  autoUpdater.on('update-available', (info) => {
+    mainWindow?.webContents.send('update-available', {
+      version: info.version,
+      notes:   info.releaseNotes || '',
+      date:    info.releaseDate,
+    });
   });
-});
 
-// Обновлений нет
-autoUpdater.on('update-not-available', () => {
-  mainWindow?.webContents.send('update-not-available');
-});
-
-// Прогресс скачивания
-autoUpdater.on('download-progress', (progress) => {
-  mainWindow?.webContents.send('update-download-progress', {
-    percent:  Math.round(progress.percent),
-    speed:    progress.bytesPerSecond,
-    total:    progress.total,
-    loaded:   progress.transferred,
+  autoUpdater.on('update-not-available', () => {
+    mainWindow?.webContents.send('update-not-available');
   });
-});
 
-// Скачано — готово к установке
-autoUpdater.on('update-downloaded', (info) => {
-  mainWindow?.webContents.send('update-downloaded', {
-    version: info.version,
+  autoUpdater.on('download-progress', (progress) => {
+    mainWindow?.webContents.send('update-download-progress', {
+      percent: Math.round(progress.percent),
+      speed:   progress.bytesPerSecond,
+      total:   progress.total,
+      loaded:  progress.transferred,
+    });
   });
-});
 
-// Ошибка обновления
-autoUpdater.on('error', (err) => {
-  mainWindow?.webContents.send('update-error', err.message);
-});
+  autoUpdater.on('update-downloaded', (info) => {
+    mainWindow?.webContents.send('update-downloaded', {
+      version: info.version,
+    });
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('AutoUpdater error:', err);
+    mainWindow?.webContents.send('update-error', err.message);
+  });
+}
 
 // ─── App Ready ────────────────────────────────────
 app.whenReady().then(() => {
+  setupUpdaterEvents();
   createSplash();
   createMainWindow();
 });
@@ -166,9 +173,8 @@ ipcMain.on('open-minecraft-folder', () => {
 ipcMain.handle('get-minecraft-path', () => getMinecraftPath());
 
 // ─── IPC — Обновления ─────────────────────────────
-
-// Начать скачивание
 ipcMain.handle('update-download', async () => {
+  if (!autoUpdater) return { success: false, error: 'Updater недоступен' };
   try {
     await autoUpdater.downloadUpdate();
     return { success: true };
@@ -177,15 +183,16 @@ ipcMain.handle('update-download', async () => {
   }
 });
 
-// Установить и перезапустить
 ipcMain.on('update-install', () => {
-  autoUpdater.quitAndInstall(false, true);
+  autoUpdater?.quitAndInstall(false, true);
 });
 
-// Ручная проверка обновлений
 ipcMain.handle('check-updates-manual', async () => {
   if (!app.isPackaged) {
-    return { success: false, error: 'Dev режим' };
+    return { success: false, error: 'Dev режим — обновления недоступны' };
+  }
+  if (!autoUpdater) {
+    return { success: false, error: 'Updater недоступен' };
   }
   try {
     const result = await autoUpdater.checkForUpdates();
@@ -195,7 +202,6 @@ ipcMain.handle('check-updates-manual', async () => {
   }
 });
 
-// Получить текущую версию
 ipcMain.handle('get-app-version', () => app.getVersion());
 
 // ─── IPC — Java ───────────────────────────────────
@@ -203,7 +209,7 @@ ipcMain.handle('browse-java', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title:      'Выберите java.exe',
     properties: ['openFile'],
-    filters: [{ name: 'Java', extensions: ['exe', ''] }]
+    filters:    [{ name: 'Java', extensions: ['exe', ''] }]
   });
   if (!result.canceled && result.filePaths.length > 0) {
     return result.filePaths[0];
