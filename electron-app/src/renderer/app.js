@@ -814,13 +814,12 @@ async function restoreSession() {
 // ─── Settings ─────────────────────────────────────
 function initSettings() {
   loadSavedSettings();
-  initThemes();
 
   document.getElementById('default-ram')?.addEventListener('change', e => {
     ipcRenderer.invoke('store-set', 'defaultRam', e.target.value);
     const slider = document.getElementById('ram-slider');
     const disp   = document.getElementById('ram-display');
-    if (slider) slider.value    = e.target.value;
+    if (slider) slider.value     = e.target.value;
     if (disp)   disp.textContent = e.target.value;
   });
 
@@ -844,10 +843,14 @@ function initSettings() {
     const btn = document.getElementById('check-updates-btn');
     setBtn(btn, 'Проверяю...', true);
     try {
-      const res  = await fetch(`${API}/launcher/latest`, {signal: AbortSignal.timeout(5000)});
+      const res  = await fetch(`${API}/launcher/latest`, {
+        signal: AbortSignal.timeout(5000)
+      });
       const data = await res.json();
       showNotif(
-        data.version === '1.0.0' ? 'У вас последняя версия ✅' : `Доступна ${data.version}!`,
+        data.version === '1.0.0'
+          ? 'У вас последняя версия ✅'
+          : `Доступна версия ${data.version}!`,
         'success'
       );
     } catch {
@@ -856,16 +859,19 @@ function initSettings() {
       setBtn(btn, 'Проверить обновления', false);
     }
   });
+
+  // ── Темы ── добавить сюда
+  initThemes();
 }
 
 // ─── Themes ───────────────────────────────────────
 function initThemes() {
-  // Загрузить сохранённую тему
+  // Загрузить сохранённую тему при старте
   ipcRenderer.invoke('store-get', 'theme').then(theme => {
-    if (theme) applyTheme(theme, false);
+    applyTheme(theme || 'purple', false);
   });
 
-  // Клик по теме
+  // Клик по кнопке темы
   document.querySelectorAll('.theme-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       applyTheme(btn.dataset.theme, true);
@@ -874,18 +880,18 @@ function initThemes() {
 }
 
 function applyTheme(theme, save = true) {
-  // Применить к html
+  // Применяем к html элементу
   document.documentElement.setAttribute('data-theme', theme);
 
-  // Обновить активную кнопку
+  // Обновляем активную кнопку
   document.querySelectorAll('.theme-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.theme === theme);
   });
 
-  // Сохранить
+  // Сохраняем
   if (save) {
     ipcRenderer.invoke('store-set', 'theme', theme);
-    showNotif(`Тема изменена! 🎨`, 'success');
+    showNotif('Тема изменена! 🎨', 'success');
   }
 }
 

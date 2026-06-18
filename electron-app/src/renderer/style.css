@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════
    COSMOLAUNCHER — FULL STYLES
 ═══════════════════════════════════════════════════ */
-[data-theme="purple"], :root {
+:root {
   --bg-primary:    #0d0a1a;
   --bg-secondary:  #12101f;
   --bg-card:       #1a1630;
@@ -19,10 +19,17 @@
   --orb-color-1:   #7c3aed;
   --orb-color-2:   #a855f7;
   --orb-color-3:   #4f46e5;
+  --success:       #10b981;
+  --error:         #ef4444;
+  --warning:       #f59e0b;
+  --radius:        12px;
+  --radius-sm:     8px;
+  --radius-lg:     18px;
+  --transition:    all 0.2s ease;
 }
 
 /* Тёмно-синяя */
-[data-theme="blue"] {
+html[data-theme="blue"] {
   --bg-primary:    #070d1a;
   --bg-secondary:  #0a1220;
   --bg-card:       #0f1e35;
@@ -43,7 +50,7 @@
 }
 
 /* Тёмно-зелёная */
-[data-theme="green"] {
+html[data-theme="green"] {
   --bg-primary:    #071a0d;
   --bg-secondary:  #0a2012;
   --bg-card:       #0f3018;
@@ -64,7 +71,7 @@
 }
 
 /* Красная */
-[data-theme="red"] {
+html[data-theme="red"] {
   --bg-primary:    #1a0707;
   --bg-secondary:  #200a0a;
   --bg-card:       #300f0f;
@@ -85,7 +92,7 @@
 }
 
 /* Чёрная AMOLED */
-[data-theme="amoled"] {
+html[data-theme="amoled"] {
   --bg-primary:    #000000;
   --bg-secondary:  #0a0a0a;
   --bg-card:       #111111;
@@ -106,7 +113,7 @@
 }
 
 /* Розовая */
-[data-theme="pink"] {
+html[data-theme="pink"] {
   --bg-primary:    #1a0714;
   --bg-secondary:  #200a18;
   --bg-card:       #300f25;
@@ -126,32 +133,14 @@
   --orb-color-3:   #db2777;
 }
 
+/* Общие переменные которые не меняются */
 :root {
-  --bg-primary:    #0d0a1a;
-  --bg-secondary:  #12101f;
-  --bg-card:       #1a1630;
-  --bg-card-hover: #201c3a;
-  --bg-input:      #150f28;
-
-  --accent-1:      #7c3aed;
-  --accent-2:      #a855f7;
-  --accent-3:      #c084fc;
-  --accent-glow:   rgba(124,58,237,0.4);
-
-  --text-primary:  #f0eaff;
-  --text-secondary:#9d8ec0;
-  --text-muted:    #5a4f7a;
-
-  --border:        rgba(124,58,237,0.2);
-  --border-hover:  rgba(168,85,247,0.4);
-
-  --success:  #10b981;
-  --error:    #ef4444;
-  --warning:  #f59e0b;
-
-  --radius:    12px;
-  --radius-sm: 8px;
-  --radius-lg: 18px;
+  --success:    #10b981;
+  --error:      #ef4444;
+  --warning:    #f59e0b;
+  --radius:     12px;
+  --radius-sm:  8px;
+  --radius-lg:  18px;
   --transition: all 0.2s ease;
 }
 
