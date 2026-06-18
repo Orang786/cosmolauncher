@@ -1,0 +1,25 @@
+# Node modules
+node_modules/
+backend/node_modules/
+electron-app/node_modules/
+
+# Сборка
+electron-app/dist/
+electron-app/out/
+
+# Переменные окружения (ВАЖНО — никогда не заливай!)
+.env
+backend/.env
+*.env
+
+# Логи
+*.log
+npm-debug.log*
+
+# OS файлы
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

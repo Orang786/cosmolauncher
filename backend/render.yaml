@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: cosmolauncher-api
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: NODE_ENV
+        value: production
+      - key: SITE_URL
+        value: https://cosmolauncher.onrender.com

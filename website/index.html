@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="CosmoLauncher — бесплатный лаунчер Minecraft с поддержкой всех версий">
+  <title>CosmoLauncher — Minecraft Launcher</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <div class="particles" id="particles"></div>
+  <div class="cursor-glow" id="cursor-glow"></div>
+
+  <!-- Navbar -->
+  <header class="navbar" id="navbar">
+    <div class="container nav-inner">
+      <div class="nav-logo">
+        <span class="logo-star">✦</span>
+        CosmoLauncher
+      </div>
+      <nav class="nav-links">
+        <a href="#features">Возможности</a>
+        <a href="#screenshots">Интерфейс</a>
+        <a href="#versions">Версии</a>
+        <a href="#download">Скачать</a>
+      </nav>
+      <div class="nav-right">
+        <span class="nav-online-badge" id="server-badge">
+          <span class="badge-dot"></span>
+          Сервер работает
+        </span>
+        <a href="#download" class="nav-cta">Скачать</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero" id="hero">
+    <div class="hero-bg">
+      <div class="hero-orb hero-orb-1"></div>
+      <div class="hero-orb hero-orb-2"></div>
+      <div class="hero-orb hero-orb-3"></div>
+      <div class="hero-grid"></div>
+    </div>
+
+    <div class="container hero-content">
+      <div class="hero-badge reveal">
+        <span class="badge-pulse"></span>
+        Версия 1.0.0 — Бесплатно навсегда
+      </div>
+
+      <h1 class="hero-title reveal">
+        Minecraft без<br>
+        <span class="text-gradient">ограничений</span>
+      </h1>
+
+      <p class="hero-desc reveal">
+        CosmoLauncher — быстрый лаунчер с тёмно-фиолетовым интерфейсом,<br>
+        поддержкой всех версий и оффлайн режимом. Никаких лишних шагов.
+      </p>
+
+      <div class="hero-actions reveal">
+        <button class="btn-download-hero" id="hero-download-btn" onclick="detectAndDownload()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 16l-6-6h4V4h4v6h4l-6 6z"/>
+            <rect x="4" y="18" width="16" height="2" rx="1"/>
+          </svg>
+          <span id="hero-btn-text">Скачать для Windows</span>
+        </button>
+        <a href="#screenshots" class="btn-ghost">Посмотреть интерфейс →</a>
+      </div>
+
+      <div class="hero-meta reveal">
+        <div class="meta-item">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="color:#10b981">
+            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+          </svg>
+          Полностью бесплатно
+        </div>
+        <div class="meta-item">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="color:#10b981">
+            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+          </svg>
+          Без вирусов
+        </div>
+        <div class="meta-item">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="color:#10b981">
+            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+          </svg>
+          Open Source
+        </div>
+        <div class="meta-item">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="color:#10b981">
+            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
+          </svg>
+          Windows / Linux / macOS
+        </div>
+      </div>
+    </div>
+
+    <!-- Лаунчер мокап -->
+    <div class="launcher-preview reveal">
+      <div class="lp-window">
+        <div class="lp-titlebar">
+          <div class="lp-dots">
+            <span style="background:#ff5f57"></span>
+            <span style="background:#ffbd2e"></span>
+            <span style="background:#28ca42"></span>
+          </div>
+          <span class="lp-title">✦ CosmoLauncher</span>
+          <div></div>
+        </div>
+        <div class="lp-body">
+          <div class="lp-sidebar">
+            <div class="lp-nav active">
+              <span>🏠</span><span>Главная</span>
+            </div>
+            <div class="lp-nav">
+              <span>📦</span><span>Версии</span>
+            </div>
+            <div class="lp-nav">
+              <span>⚙️</span><span>Настройки</span>
+            </div>
+            <div class="lp-nav">
+              <span>📰</span><span>Новости</span>
+            </div>
+            <div class="lp-profile">
+              <div class="lp-avatar">S</div>
+              <div>
+                <div class="lp-uname">Steve</div>
+                <div class="lp-ustatus">CosmoLauncher</div>
+              </div>
+            </div>
+          </div>
+          <div class="lp-main">
+            <div class="lp-hero-block">
+              <div>
+                <div class="lp-h-title">Добро пожаловать в <span>CosmoLauncher</span></div>
+                <div class="lp-h-sub">Запускай Minecraft в один клик</div>
+              </div>
+              <div class="lp-creeper">👾</div>
+            </div>
+            <div class="lp-launch-card">
+              <div class="lp-lc-top">
+                <span class="lp-lc-title">Быстрый запуск</span>
+                <span class="lp-version-tag">1.20.4</span>
+              </div>
+              <div class="lp-ram-wrap">
+                <span>ОЗУ: 2048 МБ</span>
+                <div class="lp-ram-bar"><div class="lp-ram-fill"></div></div>
+              </div>
+              <div class="lp-play-btn">▶ Играть</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="lp-glow"></div>
+    </div>
+
+    <div class="hero-scroll">
+      <div class="scroll-line"></div>
+      <span>Листай вниз</span>
+    </div>
+  </section>
+
+  <!-- Stats -->
+  <section class="stats-bar reveal">
+    <div class="container stats-inner">
+      <div class="stat-item">
+        <div class="stat-num" data-target="50000">0</div>
+        <div class="stat-label">Игроков</div>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <div class="stat-num" data-target="13">0</div>
+        <div class="stat-label">Версий MC</div>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <div class="stat-num" data-target="99">0</div>
+        <div class="stat-label">% Аптайм</div>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat-item">
+        <div class="stat-num" data-target="3">0</div>
+        <div class="stat-label">Платформы</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="features section" id="features">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-badge reveal">Возможности</div>
+        <h2 class="section-title reveal">Сделан для игроков</h2>
+        <p class="section-sub reveal">Всё что нужно — в одном месте</p>
+      </div>
+      <div class="features-grid">
+        <div class="feat-card reveal" style="--d:0s">
+          <div class="feat-icon-wrap purple">⚡</div>
+          <h3>Быстрый запуск</h3>
+          <p>Автоматическая загрузка файлов. Нажал — играешь. Никаких лишних настроек.</p>
+          <div class="feat-line"></div>
+        </div>
+        <div class="feat-card reveal" style="--d:0.08s">
+          <div class="feat-icon-wrap blue">🔐</div>
+          <h3>Свой аккаунт</h3>
+          <p>Создай аккаунт CosmoLauncher. Твои настройки сохраняются в облаке.</p>
+          <div class="feat-line"></div>
+        </div>
+        <div class="feat-card reveal" style="--d:0.16s">
+          <div class="feat-icon-wrap pink">🏴‍☠️</div>
+          <h3>Оффлайн режим</h3>
+          <p>Играй без покупки Minecraft. Просто введи никнейм и запускай.</p>
+          <div class="feat-line"></div>
+        </div>
+        <div class="feat-card reveal" style="--d:0.24s">
+          <div class="feat-icon-wrap green">📦</div>
+          <h3>Все версии</h3>
+          <p>От 1.5 до 1.20.4. Release и старые версии — все доступны сразу.</p>
+          <div class="feat-line"></div>
+        </div>
+        <div class="feat-card reveal" style="--d:0.32s">
+          <div class="feat-icon-wrap orange">🚀</div>
+          <h3>Оптимизация FPS</h3>
+          <p>Встроенные JVM аргументы для максимальной производительности.</p>
+          <div class="feat-line"></div>
+        </div>
+        <div class="feat-card reveal" style="--d:0.40s">
+          <div class="feat-icon-wrap purple">🎨</div>
+          <h3>Красивый UI</h3>
+          <p>Тёмно-фиолетовая тема, плавные анимации. Приятно смотреть и использовать.</p>
+          <div class="feat-line"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Screenshots / Interface -->
+  <section class="interface section" id="screenshots">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-badge reveal">Интерфейс</div>
+        <h2 class="section-title reveal">Выглядит как надо</h2>
+      </div>
+      <div class="interface-grid">
+        <div class="if-left reveal">
+          <div class="if-tabs">
+            <button class="if-tab active" data-tab="home">Главная</button>
+            <button class="if-tab" data-tab="versions">Версии</button>
+            <button class="if-tab" data-tab="settings">Настройки</button>
+          </div>
+          <div class="if-screen active" id="if-home">
+            <!-- Главный экран -->
+            <div class="ifs-window">
+              <div class="ifs-titlebar">
+                <span>✦ CosmoLauncher</span>
+                <div class="ifs-wbtns">
+                  <span>─</span><span>□</span><span>✕</span>
+                </div>
+              </div>
+              <div class="ifs-body">
+                <div class="ifs-sidebar">
+                  <div class="ifs-nav act">🏠 Главная</div>
+                  <div class="ifs-nav">📦 Версии</div>
+                  <div class="ifs-nav">⚙️ Настройки</div>
+                </div>
+                <div class="ifs-content">
+                  <div class="ifs-hero">
+                    <div class="ifs-htitle">Добро пожаловать в <span>CosmoLauncher</span></div>
+                    <div class="ifs-hsub">Запускай Minecraft в один клик</div>
+                  </div>
+                  <div class="ifs-card">
+                    <div class="ifs-ctop">
+                      <b>Быстрый запуск</b>
+                      <span class="ifs-ver">1.20.4 ▼</span>
+                    </div>
+                    <div class="ifs-ram">
+                      <span>ОЗУ: 2048 МБ</span>
+                      <div class="ifs-rbar"><div class="ifs-rfill" style="width:60%"></div></div>
+                    </div>
+                    <div class="ifs-pbtn">▶ Играть</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="if-screen" id="if-versions">
+            <div class="ifs-window">
+              <div class="ifs-titlebar">
+                <span>✦ CosmoLauncher — Версии</span>
+                <div class="ifs-wbtns"><span>─</span><span>□</span><span>✕</span></div>
+              </div>
+              <div class="ifs-body">
+                <div class="ifs-sidebar">
+                  <div class="ifs-nav">🏠 Главная</div>
+                  <div class="ifs-nav act">📦 Версии</div>
+                  <div class="ifs-nav">⚙️ Настройки</div>
+                </div>
+                <div class="ifs-content">
+                  <div class="ifs-vtitle">Версии Minecraft</div>
+                  <div class="ifs-vfilter">
+                    <span class="ifs-vf act">Release</span>
+                    <span class="ifs-vf">Snapshot</span>
+                    <span class="ifs-vf">Старые</span>
+                  </div>
+                  <div class="ifs-vgrid">
+                    <div class="ifs-vcard sel">
+                      <div class="ifs-vnum">1.20.4</div>
+                      <div class="ifs-vtype">Latest Release</div>
+                      <div class="ifs-vbtn">▶ Играть</div>
+                    </div>
+                    <div class="ifs-vcard">
+                      <div class="ifs-vnum">1.20.1</div>
+                      <div class="ifs-vtype">Release</div>
+                      <div class="ifs-vbtn">▶ Играть</div>
+                    </div>
+                    <div class="ifs-vcard">
+                      <div class="ifs-vnum">1.19.4</div>
+                      <div class="ifs-vtype">Release</div>
+                      <div class="ifs-vbtn">▶ Играть</div>
+                    </div>
+                    <div class="ifs-vcard">
+                      <div class="ifs-vnum">1.16.5</div>
+                      <div class="ifs-vtype">Release</div>
+                      <div class="ifs-vbtn">▶ Играть</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="if-screen" id="if-settings">
+            <div class="ifs-window">
+              <div class="ifs-titlebar">
+                <span>✦ CosmoLauncher — Настройки</span>
+                <div class="ifs-wbtns"><span>─</span><span>□</span><span>✕</span></div>
+              </div>
+              <div class="ifs-body">
+                <div class="ifs-sidebar">
+                  <div class="ifs-nav">🏠 Главная</div>
+                  <div class="ifs-nav">📦 Версии</div>
+                  <div class="ifs-nav act">⚙️ Настройки</div>
+                </div>
+                <div class="ifs-content">
+                  <div class="ifs-vtitle">Настройки</div>
+                  <div class="ifs-scard">
+                    <div class="ifs-sctitle">👤 Аккаунт</div>
+                    <div class="ifs-user-row">
+                      <div class="ifs-uavatar">S</div>
+                      <div>
+                        <div class="ifs-uname">Steve</div>
+                        <div class="ifs-uemail">steve@cosmo.com</div>
+                        <div class="ifs-ubadge">CosmoLauncher аккаунт</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="ifs-scard" style="margin-top:8px">
+                    <div class="ifs-sctitle">🖥️ Java и производительность</div>
+                    <div class="ifs-srow"><span>ОЗУ по умолчанию</span><span class="ifs-sval">2 GB</span></div>
+                    <div class="ifs-srow"><span>Полный экран</span><span class="ifs-toggle on"></span></div>
+                    <div class="ifs-srow"><span>Закрывать лаунчер</span><span class="ifs-toggle on"></span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="if-right reveal">
+          <h3 class="if-r-title">Всё продумано</h3>
+          <div class="if-points">
+            <div class="if-point">
+              <div class="if-point-icon">✦</div>
+              <div>
+                <h4>Тёмно-фиолетовая тема</h4>
+                <p>Глаза не устают даже после долгих сессий</p>
+              </div>
+            </div>
+            <div class="if-point">
+              <div class="if-point-icon">✦</div>
+              <div>
+                <h4>Кастомный заголовок окна</h4>
+                <p>Без стандартного виндовского titlebar</p>
+              </div>
+            </div>
+            <div class="if-point">
+              <div class="if-point-icon">✦</div>
+              <div>
+                <h4>Плавные анимации</h4>
+                <p>Переходы и эффекты сделаны вручную</p>
+              </div>
+            </div>
+            <div class="if-point">
+              <div class="if-point-icon">✦</div>
+              <div>
+                <h4>Консоль логов</h4>
+                <p>Видишь всё что происходит при запуске</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Versions -->
+  <section class="versions-section section" id="versions">
+    <div class="container">
+      <div class="section-head">
+        <div class="section-badge reveal">Версии</div>
+        <h2 class="section-title reveal">Поддерживаемые версии</h2>
+        <p class="section-sub reveal">Данные загружаются с нашего сервера в реальном времени</p>
+      </div>
+      <div class="versions-live reveal">
+        <div class="vl-header">
+          <div class="vl-status">
+            <span class="vl-dot"></span>
+            Live данные с сервера
+          </div>
+          <div class="vl-filters">
+            <button class="vl-filter active" data-f="all">Все</button>
+            <button class="vl-filter" data-f="release">Release</button>
+            <button class="vl-filter" data-f="old_release">Старые</button>
+          </div>
+        </div>
+        <div class="vl-grid" id="versions-live-grid">
+          <!-- JS заполнит с API -->
+          <div class="vl-loading">
+            <div class="spinner"></div>
+            Загрузка версий...
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Download -->
+  <section class="download section" id="download">
+    <div class="dl-bg">
+      <div class="dl-orb1"></div>
+      <div class="dl-orb2"></div>
+    </div>
+    <div class="container">
+      <div class="section-head">
+        <div class="section-badge reveal">Скачать</div>
+        <h2 class="section-title reveal">Начни играть сегодня</h2>
+        <p class="section-sub reveal">Бесплатно. Без регистрации. Без рекламы.</p>
+      </div>
+
+      <!-- Авто-определение ОС -->
+      <div class="os-detect reveal">
+        <div class="os-detect-badge" id="os-detected-badge">
+          <span id="os-icon">🪟</span>
+          Обнаружена система: <strong id="os-name">Windows</strong>
+        </div>
+      </div>
+
+      <div class="dl-cards reveal">
+        <!-- Windows -->
+        <div class="dl-card" id="dl-win" data-os="win32">
+          <div class="dl-card-inner">
+            <div class="dl-os-emoji">🪟</div>
+            <div class="dl-os-name">Windows</div>
+            <div class="dl-os-ver">Windows 10 / 11</div>
+            <div class="dl-info">
+              <span class="dl-size">~85 МБ</span>
+              <span class="dl-format">.exe installer</span>
+            </div>
+            <button class="dl-btn primary" onclick="downloadFile('win32')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 16l-6-6h4V4h4v6h4l-6 6z"/>
+                <rect x="4" y="18" width="16" height="2" rx="1"/>
+              </svg>
+              Скачать .exe
+            </button>
+            <div class="dl-extra">
+              <a href="#" onclick="downloadFile('win32-portable'); return false">Портативная версия</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Linux -->
+        <div class="dl-card" id="dl-linux" data-os="linux">
+          <div class="dl-card-inner">
+            <div class="dl-os-emoji">🐧</div>
+            <div class="dl-os-name">Linux</div>
+            <div class="dl-os-ver">Ubuntu / Debian / Arch</div>
+            <div class="dl-info">
+              <span class="dl-size">~80 МБ</span>
+              <span class="dl-format">.AppImage</span>
+            </div>
+            <button class="dl-btn secondary" onclick="downloadFile('linux')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 16l-6-6h4V4h4v6h4l-6 6z"/>
+                <rect x="4" y="18" width="16" height="2" rx="1"/>
+              </svg>
+              Скачать .AppImage
+            </button>
+            <div class="dl-extra">
+              <a href="#" onclick="downloadFile('linux-deb'); return false">.deb пакет</a>
+              ·
+              <a href="#" onclick="downloadFile('linux-rpm'); return false">.rpm пакет</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- macOS -->
+        <div class="dl-card" id="dl-mac" data-os="darwin">
+          <div class="dl-card-inner">
+            <div class="dl-os-emoji">🍎</div>
+            <div class="dl-os-name">macOS</div>
+            <div class="dl-os-ver">macOS 11 Big Sur и выше</div>
+            <div class="dl-info">
+              <span class="dl-size">~90 МБ</span>
+              <span class="dl-format">.dmg</span>
+            </div>
+            <button class="dl-btn secondary" onclick="downloadFile('darwin')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 16l-6-6h4V4h4v6h4l-6 6z"/>
+                <rect x="4" y="18" width="16" height="2" rx="1"/>
+              </svg>
+              Скачать .dmg
+            </button>
+            <div class="dl-extra">
+              <a href="#" onclick="downloadFile('darwin-arm'); return false">Apple Silicon (M1/M2)</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Инструкция по установке -->
+      <div class="install-guide reveal">
+        <h3>Как установить?</h3>
+        <div class="ig-tabs">
+          <button class="ig-tab active" data-os-tab="windows">Windows</button>
+          <button class="ig-tab" data-os-tab="linux">Linux</button>
+          <button class="ig-tab" data-os-tab="macos">macOS</button>
+        </div>
+        <div class="ig-content active" id="ig-windows">
+          <div class="ig-step">
+            <div class="ig-step-num">1</div>
+            <div>Скачайте файл <code>CosmoLauncher-Setup.exe</code></div>
+          </div>
+          <div class="ig-step">
+            <div class="ig-step-num">2</div>
+            <div>Запустите установщик. Если Windows предупреждает — нажмите <em>"Подробнее" → "Запустить в любом случае"</em></div>
+          </div>
+          <div class="ig-step">
+            <div class="ig-step-num">3</div>
+            <div>Следуйте инструкциям установщика</div>
+          </div>
+          <div class="ig-step">
+            <div class="ig-step-num">4</div>
+            <div>Запустите <code>CosmoLauncher</code> с рабочего стола</div>
+          </div>
+          <div class="ig-note">
+            ⚠️ Java устанавливается автоматически если не найдена
+          </div>
+        </div>
+        <div class="ig-content" id="ig-linux">
+          <div class="ig-step">
+            <div class="ig-step-num">1</div>
+            <div>Скачайте <code>CosmoLauncher.AppImage</code></div>
+          </div>
+          <div class="ig-step">
+            <div class="ig-step-num">2</div>
+            <div>Дайте права на выполнение:
+              <div class="ig-code">chmod +x CosmoLauncher-*.AppImage</div>
+            </div>
+          </div>
+          <div class="ig-step">
+            <div class="ig-step-num">3</div>
+            <div>Запустите двойным кликом или через терминал:
+              <div class="ig-code">./CosmoLauncher-*.AppImage</div>
+            </div>
+          </div>
+        </div>
+        <div class="ig-content" id="ig-macos">
+          <div class="ig-step">
+            <div class="ig-step-num">1</div>
+            <div>Скачайте <code>CosmoLauncher.dmg</code></div>
+          </div>
+          <div class="ig-step">
+            <div class="ig-step-num">2</div>
+            <div>Откройте .dmg и перетащите приложение в папку Applications</div>
+          </div>
+          <div class="ig-step">
+            <div class="ig-step-num">3</div>
+            <div>При первом запуске: ПКМ на приложении → <em>Открыть</em></div>
+          </div>
+          <div class="ig-note">
+            ⚠️ На Apple Silicon (M1/M2) рекомендуется ARM версия
+          </div>
+        </div>
+      </div>
+
+      <!-- Системные требования -->
+      <div class="sysreq reveal">
+        <h3>Системные требования</h3>
+        <div class="sysreq-grid">
+          <div class="sysreq-col">
+            <h4>Минимальные</h4>
+            <div class="sr-row"><span>ОС</span><span>Win 10, Ubuntu 20.04, macOS 11</span></div>
+            <div class="sr-row"><span>CPU</span><span>Intel Core i3 / AMD Ryzen 3</span></div>
+            <div class="sr-row"><span>RAM</span><span>4 GB</span></div>
+            <div class="sr-row"><span>Диск</span><span>500 MB</span></div>
+            <div class="sr-row"><span>Java</span><span>Авто-загрузка</span></div>
+          </div>
+          <div class="sysreq-col">
+            <h4>Рекомендуемые</h4>
+            <div class="sr-row"><span>ОС</span><span>Win 11, Ubuntu 22.04, macOS 13</span></div>
+            <div class="sr-row"><span>CPU</span><span>Intel Core i5 / AMD Ryzen 5</span></div>
+            <div class="sr-row"><span>RAM</span><span>8 GB</span></div>
+            <div class="sr-row"><span>Диск</span><span>2 GB SSD</span></div>
+            <div class="sr-row"><span>GPU</span><span>Выделенная видеокарта</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <div class="footer-logo">✦ CosmoLauncher</div>
+          <p>Лаунчер Minecraft нового поколения.<br>Бесплатно и навсегда.</p>
+          <div class="footer-socials">
+            <a href="#" class="social-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03z"/>
+              </svg>
+              Discord
+            </a>
+            <a href="#" class="social-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+              </svg>
+              GitHub
+            </a>
+            <a href="#" class="social-btn">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+              </svg>
+              Telegram
+            </a>
+          </div>
+        </div>
+        <div class="footer-cols">
+          <div class="footer-col">
+            <h5>Лаунчер</h5>
+            <a href="#download">Скачать</a>
+            <a href="#features">Возможности</a>
+            <a href="#versions">Версии MC</a>
+            <a href="#">Changelog</a>
+          </div>
+          <div class="footer-col">
+            <h5>Сообщество</h5>
+            <a href="#">Discord сервер</a>
+            <a href="#">Telegram канал</a>
+            <a href="#">GitHub</a>
+            <a href="#">Баг-репорты</a>
+          </div>
+          <div class="footer-col">
+            <h5>Правовое</h5>
+            <a href="#">Условия использования</a>
+            <a href="#">Конфиденциальность</a>
+            <a href="#">Лицензия</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>© 2024 CosmoLauncher. Не является продуктом Mojang Studios или Microsoft.</p>
+        <div class="footer-version">
+          v1.0.0
+          <span class="fv-dot"></span>
+          <span id="footer-server-status">Проверка...</span>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

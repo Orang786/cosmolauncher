@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CosmoLauncher</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Фоновые эффекты -->
+  <div class="bg-orbs">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+
+  <!-- Кастомный заголовок окна -->
+  <div class="titlebar">
+    <div class="titlebar-drag-area">
+      <div class="app-logo">
+        <span class="logo-icon">✦</span>
+        <span class="logo-text">CosmoLauncher</span>
+      </div>
+    </div>
+    <div class="window-controls">
+      <button class="win-btn minimize" id="btn-minimize" title="Свернуть">
+        <svg width="12" height="2" viewBox="0 0 12 2"><rect width="12" height="2" fill="currentColor"/></svg>
+      </button>
+      <button class="win-btn maximize" id="btn-maximize" title="Развернуть">
+        <svg width="11" height="11" viewBox="0 0 11 11"><rect x="0.5" y="0.5" width="10" height="10" rx="1" stroke="currentColor" fill="none"/></svg>
+      </button>
+      <button class="win-btn close" id="btn-close" title="Закрыть">
+        <svg width="12" height="12" viewBox="0 0 12 12"><line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" stroke-width="1.8"/><line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" stroke-width="1.8"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Основной контент -->
+  <div class="main-layout">
+
+    <!-- Боковая панель -->
+    <aside class="sidebar">
+      <nav class="nav-menu">
+        <button class="nav-item active" data-page="home">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+            <polyline points="9,22 9,12 15,12 15,22"/>
+          </svg>
+          <span>Главная</span>
+        </button>
+
+        <button class="nav-item" data-page="versions">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="12,2 2,7 12,12 22,7"/>
+            <polyline points="2,17 12,22 22,17"/>
+            <polyline points="2,12 12,17 22,12"/>
+          </svg>
+          <span>Версии</span>
+        </button>
+
+        <button class="nav-item" data-page="settings">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+          </svg>
+          <span>Настройки</span>
+        </button>
+
+        <button class="nav-item" data-page="news">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2"/>
+            <line x1="18" y1="14" x2="18" y2="14"/><line x1="18" y1="18" x2="18" y2="18"/>
+            <line x1="14" y1="6" x2="14" y2="6"/>
+          </svg>
+          <span>Новости</span>
+        </button>
+      </nav>
+
+      <!-- Профиль пользователя -->
+      <div class="sidebar-profile" id="sidebar-profile">
+        <div class="profile-avatar" id="profile-avatar">?</div>
+        <div class="profile-info">
+          <div class="profile-name" id="profile-name">Не войдено</div>
+          <div class="profile-status" id="profile-status">Нажмите для входа</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Основная область -->
+    <main class="content-area">
+
+      <!-- ───── Страница: Главная ───── -->
+      <section class="page active" id="page-home">
+        <div class="home-hero">
+          <div class="hero-content">
+            <h1 class="hero-title">
+              Добро пожаловать<br>
+              <span class="gradient-text">в CosmoLauncher</span>
+            </h1>
+            <p class="hero-subtitle">
+              Запускай Minecraft в один клик.<br>Никаких лишних настроек — просто играй.
+            </p>
+          </div>
+
+          <div class="minecraft-bg-art">
+            <div class="pixel-art">
+              <div class="creeper-face">
+                <div class="creeper-eyes">
+                  <div class="eye"></div>
+                  <div class="eye"></div>
+                </div>
+                <div class="creeper-mouth">
+                  <div class="mouth-row">
+                    <div class="m off"></div><div class="m on"></div><div class="m on"></div><div class="m off"></div>
+                  </div>
+                  <div class="mouth-row">
+                    <div class="m on"></div><div class="m on"></div><div class="m on"></div><div class="m on"></div>
+                  </div>
+                  <div class="mouth-row">
+                    <div class="m on"></div><div class="m off"></div><div class="m off"></div><div class="m on"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Быстрый запуск -->
+        <div class="quick-launch">
+          <div class="launch-card">
+            <div class="launch-header">
+              <h2 class="launch-title">Быстрый запуск</h2>
+              <div class="version-select-wrap">
+                <label>Версия:</label>
+                <select id="quick-version" class="select-styled">
+                  <option value="1.20.4">1.20.4 (Latest)</option>
+                  <option value="1.20.1">1.20.1</option>
+                  <option value="1.19.4">1.19.4</option>
+                  <option value="1.18.2">1.18.2</option>
+                  <option value="1.17.1">1.17.1</option>
+                  <option value="1.16.5">1.16.5</option>
+                  <option value="1.12.2">1.12.2</option>
+                  <option value="1.8.9">1.8.9</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="launch-controls">
+              <div class="ram-control">
+                <label>Оперативная память: <span id="ram-display">2048</span> МБ</label>
+                <input type="range" id="ram-slider" min="512" max="8192" step="512" value="2048" class="slider">
+                <div class="ram-marks">
+                  <span>512</span><span>2048</span><span>4096</span><span>8192</span>
+                </div>
+              </div>
+
+              <button class="launch-btn" id="launch-btn">
+                <span class="btn-icon">▶</span>
+                <span class="btn-text">Играть</span>
+                <div class="btn-glow"></div>
+              </button>
+            </div>
+
+            <!-- Прогресс загрузки -->
+            <div class="download-progress" id="download-progress" style="display:none">
+              <div class="progress-info">
+                <span id="progress-text">Подготовка...</span>
+                <span id="progress-percent">0%</span>
+              </div>
+              <div class="progress-bar-wrap">
+                <div class="progress-bar" id="progress-bar"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Консоль -->
+        <div class="console-section" id="console-section" style="display:none">
+          <div class="console-header">
+            <span>Консоль</span>
+            <button class="console-clear" id="console-clear">Очистить</button>
+          </div>
+          <div class="console-output" id="console-output"></div>
+        </div>
+      </section>
+
+      <!-- ───── Страница: Версии ───── -->
+      <section class="page" id="page-versions">
+        <h2 class="page-title">Версии Minecraft</h2>
+        <div class="versions-filter">
+          <button class="filter-btn active" data-filter="release">Release</button>
+          <button class="filter-btn" data-filter="snapshot">Snapshot</button>
+          <button class="filter-btn" data-filter="old">Старые</button>
+        </div>
+        <div class="versions-grid" id="versions-grid">
+          <!-- JS заполнит -->
+        </div>
+      </section>
+
+      <!-- ───── Страница: Настройки ───── -->
+      <section class="page" id="page-settings">
+        <h2 class="page-title">Настройки</h2>
+        <div class="settings-grid">
+
+          <div class="settings-card">
+            <h3 class="settings-card-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+              Аккаунт
+            </h3>
+
+            <div class="auth-section" id="auth-section">
+              <!-- Состояние: не вошёл -->
+              <div id="auth-logged-out">
+                <div class="auth-tabs">
+                  <button class="auth-tab active" data-tab="login">Войти</button>
+                  <button class="auth-tab" data-tab="register">Регистрация</button>
+                </div>
+
+                <div class="auth-form" id="auth-form-login">
+                  <div class="form-group">
+                    <label>Email или никнейм</label>
+                    <input type="text" id="login-email" class="input-styled" placeholder="example@mail.com">
+                  </div>
+                  <div class="form-group">
+                    <label>Пароль</label>
+                    <input type="password" id="login-password" class="input-styled" placeholder="••••••••">
+                  </div>
+                  <button class="btn-primary" id="btn-login">Войти в аккаунт</button>
+                  <button class="btn-secondary" id="btn-offline">Войти без аккаунта</button>
+                </div>
+
+                <div class="auth-form hidden" id="auth-form-register">
+                  <div class="form-group">
+                    <label>Никнейм</label>
+                    <input type="text" id="reg-username" class="input-styled" placeholder="Steve">
+                  </div>
+                  <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="reg-email" class="input-styled" placeholder="example@mail.com">
+                  </div>
+                  <div class="form-group">
+                    <label>Пароль</label>
+                    <input type="password" id="reg-password" class="input-styled" placeholder="Минимум 8 символов">
+                  </div>
+                  <div class="form-group">
+                    <label>Повторите пароль</label>
+                    <input type="password" id="reg-password2" class="input-styled" placeholder="••••••••">
+                  </div>
+                  <button class="btn-primary" id="btn-register">Создать аккаунт</button>
+                </div>
+              </div>
+
+              <!-- Состояние: вошёл -->
+              <div id="auth-logged-in" class="hidden">
+                <div class="logged-in-card">
+                  <div class="user-avatar-big" id="user-avatar-big">S</div>
+                  <div class="user-details">
+                    <div class="user-name-big" id="user-name-big">Steve</div>
+                    <div class="user-email-display" id="user-email-display">steve@cosmo.com</div>
+                    <div class="user-type-badge">CosmoLauncher аккаунт</div>
+                  </div>
+                </div>
+                <button class="btn-danger" id="btn-logout">Выйти из аккаунта</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <h3 class="settings-card-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+              Java и производительность
+            </h3>
+
+            <div class="form-group">
+              <label>Путь к Java (оставьте пустым для авто)</label>
+              <div class="path-input-wrap">
+                <input type="text" id="java-path" class="input-styled" placeholder="java">
+                <button class="btn-icon-only" id="browse-java">📁</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Оперативная память по умолчанию</label>
+              <select class="select-styled" id="default-ram">
+                <option value="1024">1 GB</option>
+                <option value="2048" selected>2 GB</option>
+                <option value="3072">3 GB</option>
+                <option value="4096">4 GB</option>
+                <option value="6144">6 GB</option>
+                <option value="8192">8 GB</option>
+              </select>
+            </div>
+
+            <div class="toggle-group">
+              <label>Полноэкранный режим</label>
+              <label class="toggle">
+                <input type="checkbox" id="fullscreen-toggle">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-group">
+              <label>Закрывать лаунчер при запуске</label>
+              <label class="toggle">
+                <input type="checkbox" id="close-launcher-toggle" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <h3 class="settings-card-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+              </svg>
+              Папки
+            </h3>
+
+            <div class="folder-item">
+              <div>
+                <div class="folder-label">Папка игры</div>
+                <div class="folder-path" id="game-folder-path">~/.cosmolauncher</div>
+              </div>
+              <button class="btn-secondary small" id="open-game-folder">Открыть</button>
+            </div>
+
+            <div class="toggle-group" style="margin-top: 16px;">
+              <label>Тема лаунчера</label>
+              <select class="select-styled" id="theme-select" style="width: 140px;">
+                <option value="dark-purple" selected>Тёмно-фиолетовая</option>
+                <option value="dark-blue">Тёмно-синяя</option>
+                <option value="dark-green">Тёмно-зелёная</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <h3 class="settings-card-title">ℹ️ О программе</h3>
+            <div class="about-info">
+              <div class="about-row"><span>Версия</span><span>1.0.0</span></div>
+              <div class="about-row"><span>Electron</span><span>v28</span></div>
+              <div class="about-row"><span>Статус</span><span class="status-online">● Online</span></div>
+            </div>
+            <button class="btn-secondary" style="margin-top: 12px;">Проверить обновления</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ───── Страница: Новости ───── -->
+      <section class="page" id="page-news">
+        <h2 class="page-title">Новости</h2>
+        <div class="news-grid" id="news-grid">
+          <!-- Заглушки -->
+          <div class="news-card">
+            <div class="news-img" style="background: linear-gradient(135deg, #7c3aed, #4f46e5)">
+              <span style="font-size: 3rem">🎮</span>
+            </div>
+            <div class="news-body">
+              <div class="news-date">15 декабря 2024</div>
+              <h3>Minecraft 1.21 — что нового?</h3>
+              <p>В новом обновлении добавили трезубцы, черепашьи панцири и многое другое...</p>
+              <button class="btn-link">Читать →</button>
+            </div>
+          </div>
+          <div class="news-card">
+            <div class="news-img" style="background: linear-gradient(135deg, #a855f7, #7c3aed)">
+              <span style="font-size: 3rem">✨</span>
+            </div>
+            <div class="news-body">
+              <div class="news-date">10 декабря 2024</div>
+              <h3>CosmoLauncher 1.0 вышел!</h3>
+              <p>Мы рады представить первую официальную версию нашего лаунчера...</p>
+              <button class="btn-link">Читать →</button>
+            </div>
+          </div>
+          <div class="news-card">
+            <div class="news-img" style="background: linear-gradient(135deg, #4f46e5, #2563eb)">
+              <span style="font-size: 3rem">🔧</span>
+            </div>
+            <div class="news-body">
+              <div class="news-date">5 декабря 2024</div>
+              <h3>Оптимизация производительности</h3>
+              <p>Новые JVM аргументы обеспечивают до 30% прироста FPS в игре...</p>
+              <button class="btn-link">Читать →</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Уведомления -->
+  <div class="notifications" id="notifications"></div>
+
+  <!-- Модалка входа в оффлайн -->
+  <div class="modal-overlay" id="offline-modal">
+    <div class="modal">
+      <h3>Войти без аккаунта</h3>
+      <p>Введите никнейм для игры</p>
+      <input type="text" id="offline-username" class="input-styled" placeholder="Steve" maxlength="16">
+      <div class="modal-buttons">
+        <button class="btn-primary" id="offline-confirm">Подтвердить</button>
+        <button class="btn-secondary" id="offline-cancel">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
