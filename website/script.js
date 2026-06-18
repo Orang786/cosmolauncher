@@ -3,14 +3,14 @@ const API         = 'https://cosmolauncher-api.onrender.com/api';
 const GITHUB_USER = 'Orang786';
 const GITHUB_REPO = 'cosmolauncher';
 const VERSION     = '1.0.0';
-const GITHUB_BASE = `https://github.com/${GITHUB_USER}/${GITHUB_REPO}/releases/download/v${VERSION}`;
+const GITHUB_BASE = `https://github.com/${GITHUB_USER}/${GITHUB_REPO}/releases/download/NewUpdate`;
 
 // Ссылки на скачивание
 const DOWNLOADS = {
-  'win32':          `${GITHUB_BASE}/CosmoLauncher.Setup.${VERSION}.exe`,
-  'win32-portable': `${GITHUB_BASE}/CosmoLauncher.${VERSION}.exe`,
-  'linux':          `${GITHUB_BASE}/CosmoLauncher-${VERSION}.AppImage`,
-  'darwin':         `${GITHUB_BASE}/CosmoLauncher-${VERSION}.dmg`,
+  'win32':          `${GITHUB_BASE}/CosmoLauncher.Setup.1.0.0.exe`,
+  'win32-portable': `${GITHUB_BASE}/CosmoLauncher.1.0.0.exe`,
+  'linux':          null,
+  'darwin':         null,
 };
 
 // ─── Cursor glow ───────────────────────────────────
