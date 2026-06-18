@@ -1,9 +1,24 @@
 const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
-const path  = require('path');
+const path = require('path');
 const Store = require('electron-store');
-
 const { exec } = require('child_process');
 const fs = require('fs');
+const https = require('https');
+const { pipeline } = require('stream');
+const { promisify } = require('util');
+const streamPipeline = promisify(pipeline);
+
+// ─── Попытка подключить дополнительные модули ────
+let AdmZip, tar, glob;
+try {
+  AdmZip = require('adm-zip');
+} catch (e) { AdmZip = null; }
+try {
+  tar = require('tar');
+} catch (e) { tar = null; }
+try {
+  glob = require('glob');
+} catch (e) { glob = null; }
 
 let autoUpdater;
 let log;
@@ -13,7 +28,6 @@ try {
   autoUpdater = require('electron-updater').autoUpdater;
   log = require('electron-log');
 
-  // ── Правильная настройка логов ──
   log.transports.file.level = 'info';
   autoUpdater.logger = log;
   autoUpdater.autoDownload = false;
@@ -75,7 +89,6 @@ function createMainWindow() {
       mainWindow.show();
       mainWindow.focus();
 
-      // Проверить обновления через 4 секунды
       if (app.isPackaged && autoUpdater) {
         setTimeout(() => checkForUpdates(), 4000);
       }
@@ -130,37 +143,6 @@ function setupUpdaterEvents() {
   });
 }
 
-function findJavaVersions() {
-  return new Promise((resolve) => {
-    const cmd = process.platform === 'win32' 
-      ? 'where java' 
-      : 'which java || update-alternatives --list java || echo ""';
-    
-    exec(cmd, (error, stdout, stderr) => {
-      const paths = stdout.split('\n').filter(p => p.trim() && fs.existsSync(p.trim()));
-      if (paths.length === 0) {
-        resolve([]);
-        return;
-      }
-      // Парсим версию для каждого пути (можно ограничиться первым)
-      const results = [];
-      let pending = paths.length;
-      paths.forEach(jPath => {
-        exec(`"${jPath}" -version 2>&1`, (err, out, stderr2) => {
-          const output = stderr2 || out;
-          const match = output.match(/version "(\d+\.\d+\.\d+[^"]*?)"/) || 
-                        output.match(/version "(\d+)"/);
-          if (match) {
-            results.push({ path: jPath, version: match[1] });
-          }
-          if (--pending === 0) resolve(results);
-        });
-      });
-      if (paths.length === 0) resolve([]);
-    });
-  });
-}
-
 // ─── App Ready ────────────────────────────────────
 app.whenReady().then(() => {
   setupUpdaterEvents();
@@ -197,10 +179,6 @@ ipcMain.handle('launch-minecraft', async (_, options) => {
   } catch (err) {
     return { success: false, error: err.message };
   }
-});
-
-ipcMain.handle('find-java', async () => {
-  return await findJavaVersions();
 });
 
 // ─── IPC — Папки ──────────────────────────────────
@@ -242,7 +220,7 @@ ipcMain.handle('check-updates-manual', async () => {
 
 ipcMain.handle('get-app-version', () => app.getVersion());
 
-// ─── IPC — Java ───────────────────────────────────
+// ─── IPC — Java (ручной выбор) ──────────────────
 ipcMain.handle('browse-java', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     title:      'Выберите java.exe',
@@ -253,4 +231,212 @@ ipcMain.handle('browse-java', async () => {
     return result.filePaths[0];
   }
   return null;
+});
+
+// ═══════════════════════════════════════════════════
+// НОВЫЙ JAVA МЕНЕДЖЕР
+// ═══════════════════════════════════════════════════
+
+function findJavaVersions() {
+  return new Promise((resolve) => {
+    let cmd;
+    if (process.platform === 'win32') {
+      cmd = 'where java';
+    } else if (process.platform === 'darwin') {
+      cmd = '/usr/libexec/java_home -V 2>&1 || which java';
+    } else {
+      cmd = 'which java || update-alternatives --list java 2>/dev/null || echo ""';
+    }
+
+    exec(cmd, (error, stdout, stderr) => {
+      let paths = [];
+      if (process.platform === 'darwin') {
+        const lines = stdout.split('\n');
+        for (const line of lines) {
+          const match = line.match(/^[ \t]*(\d+\.\d+\.\d+[^,]*),[ \t]+(.*)$/);
+          if (match) {
+            const version = match[1];
+            let jpath = match[2].trim();
+            if (jpath.endsWith('/')) jpath = jpath.slice(0, -1);
+            const javaBin = path.join(jpath, 'bin', 'java');
+            if (fs.existsSync(javaBin)) {
+              paths.push({ path: javaBin, version });
+            }
+          }
+        }
+        if (paths.length === 0) {
+          exec('which java', (err, out) => {
+            const p = out.trim();
+            if (p) {
+              getJavaVersion(p, (ver) => {
+                resolve([{ path: p, version: ver || 'unknown' }]);
+              });
+            } else resolve([]);
+          });
+          return;
+        }
+      } else {
+        const raw = stdout || stderr;
+        paths = raw.split('\n')
+          .filter(line => line.trim() && fs.existsSync(line.trim()))
+          .map(line => line.trim());
+
+        if (paths.length === 0 && glob) {
+          const defaultPaths = [];
+          if (process.platform === 'win32') {
+            const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
+            const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+            defaultPaths.push(
+              path.join(programFiles, 'Java', 'jre1.8.0_*', 'bin', 'java.exe'),
+              path.join(programFiles, 'Java', 'jdk-*', 'bin', 'java.exe'),
+              path.join(programFilesX86, 'Java', 'jre1.8.0_*', 'bin', 'java.exe'),
+              path.join(programFilesX86, 'Java', 'jdk-*', 'bin', 'java.exe')
+            );
+          } else {
+            defaultPaths.push('/usr/bin/java', '/usr/local/bin/java');
+          }
+          for (const p of defaultPaths) {
+            const globbed = glob.sync(p);
+            for (const g of globbed) {
+              if (fs.existsSync(g)) paths.push(g);
+            }
+          }
+        }
+      }
+
+      if (paths.length === 0) {
+        resolve([]);
+        return;
+      }
+
+      const results = [];
+      let pending = paths.length;
+      paths.forEach(javaPath => {
+        getJavaVersion(javaPath, (version) => {
+          results.push({ path: javaPath, version: version || 'unknown' });
+          if (--pending === 0) resolve(results);
+        });
+      });
+    });
+  });
+}
+
+function getJavaVersion(javaPath, callback) {
+  exec(`"${javaPath}" -version 2>&1`, (err, stdout, stderr) => {
+    const output = stderr || stdout;
+    const match = output.match(/version "(\d+\.\d+\.\d+[^"]*?)"/) ||
+                  output.match(/version "(\d+)"/);
+    if (match) {
+      callback(match[1]);
+    } else {
+      callback(null);
+    }
+  });
+}
+
+async function downloadJava(version, destDir) {
+  if (!AdmZip || !tar) {
+    throw new Error('Для скачивания Java необходимы библиотеки adm-zip и tar. Установите их: npm install adm-zip tar');
+  }
+
+  const platform = process.platform === 'win32' ? 'windows' : 
+                   process.platform === 'darwin' ? 'mac' : 'linux';
+  const arch = process.arch === 'x64' ? 'x64' : 'x86';
+  const ext = process.platform === 'win32' ? 'zip' : 'tar.gz';
+  const url = `https://api.adoptium.net/v3/binary/latest/${version}/ga/${platform}/${arch}/jdk/hotspot/normal/eclipse?project=jdk`;
+  const filename = `java-${version}.${ext}`;
+  const destFile = path.join(destDir, filename);
+  const extractDir = path.join(destDir, `java-${version}`);
+
+  if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+
+  // Скачиваем
+  await new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(destFile);
+    https.get(url, (response) => {
+      if (response.statusCode !== 200) {
+        reject(new Error(`Ошибка загрузки: ${response.statusCode}`));
+        return;
+      }
+      streamPipeline(response, file)
+        .then(resolve)
+        .catch(reject);
+    }).on('error', reject);
+  });
+
+  // Распаковываем
+  if (process.platform === 'win32') {
+    const zip = new AdmZip(destFile);
+    zip.extractAllTo(extractDir, true);
+  } else {
+    await tar.extract({
+      file: destFile,
+      cwd: destDir,
+      strip: 1,
+    });
+  }
+
+  const binPath = process.platform === 'win32' 
+    ? path.join(extractDir, 'bin', 'java.exe')
+    : path.join(extractDir, 'bin', 'java');
+  return binPath;
+}
+
+// IPC — Java
+ipcMain.handle('find-java', async () => {
+  try {
+    return await findJavaVersions();
+  } catch (e) {
+    console.error('Ошибка поиска Java:', e);
+    return [];
+  }
+});
+
+ipcMain.handle('download-java', async (_, version, destDir) => {
+  try {
+    const javaPath = await downloadJava(version, destDir);
+    return { success: true, path: javaPath };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+// ═══════════════════════════════════════════════════
+// НОВЫЙ МЕНЕДЖЕР МОДОВ
+// ═══════════════════════════════════════════════════
+
+ipcMain.handle('mods-list-installed', async () => {
+  const mcPath = getMinecraftPath();
+  const modsDir = path.join(mcPath, 'mods');
+  if (!fs.existsSync(modsDir)) return [];
+  const files = fs.readdirSync(modsDir).filter(f => f.endsWith('.jar'));
+  return files.map(f => ({
+    name: f,
+    path: path.join(modsDir, f),
+    size: fs.statSync(path.join(modsDir, f)).size
+  }));
+});
+
+ipcMain.handle('mods-install', async (_, modId, version, downloadUrl) => {
+  const mcPath = getMinecraftPath();
+  const modsDir = path.join(mcPath, 'mods');
+  if (!fs.existsSync(modsDir)) fs.mkdirSync(modsDir, { recursive: true });
+
+  const filename = `${modId}-${version}.jar`;
+  const dest = path.join(modsDir, filename);
+  const response = await fetch(downloadUrl);
+  if (!response.ok) throw new Error(`Ошибка загрузки: ${response.status}`);
+  const buffer = await response.arrayBuffer();
+  fs.writeFileSync(dest, Buffer.from(buffer));
+  return { success: true, path: dest };
+});
+
+ipcMain.handle('mods-uninstall', async (_, filename) => {
+  const mcPath = getMinecraftPath();
+  const modPath = path.join(mcPath, 'mods', filename);
+  if (fs.existsSync(modPath)) {
+    fs.unlinkSync(modPath);
+    return { success: true };
+  }
+  return { success: false, error: 'Файл не найден' };
 });

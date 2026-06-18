@@ -1,11 +1,12 @@
 const { ipcRenderer } = require('electron');
+const path = require('path');
+const fs = require('fs');
 
 const API = 'https://cosmolauncher-api.onrender.com/api';
 
 let appVersion = '1.0.1';
 ipcRenderer.invoke('get-app-version').then(v => {
   appVersion = v;
-  // Показать версию в настройках
   const el = document.getElementById('app-version-display');
   if (el) el.textContent = `v${v}`;
 });
@@ -16,8 +17,10 @@ let allVersions    = [];
 let consoleLines   = 0;
 let profiles       = [];
 let activeProfile  = null;
-let editingProfile = null; // ID профиля при редактировании
+let editingProfile = null;
+let sessionStartTime = null;
 
+// Кеш для скинов
 const skinCache = {};
 
 // ─── Init ─────────────────────────────────────────
@@ -35,7 +38,6 @@ function initUpdater() {
   const progressTxt = document.getElementById('update-progress-text');
   const speedEl     = document.getElementById('update-speed');
 
-  // ── Найдено обновление ──
   ipcRenderer.on('update-available', (_, info) => {
     if (!banner) return;
     if (title)    title.textContent    = `🎉 Доступна версия ${info.version}!`;
@@ -44,12 +46,10 @@ function initUpdater() {
     banner.style.display = 'block';
   });
 
-  // ── Обновлений нет ──
   ipcRenderer.on('update-not-available', () => {
     showNotif('У вас последняя версия лаунчера ✅', 'success');
   });
 
-  // ── Прогресс скачивания ──
   ipcRenderer.on('update-download-progress', (_, data) => {
     if (!progressWrap) return;
     progressWrap.style.display = 'block';
@@ -61,7 +61,6 @@ function initUpdater() {
     }
   });
 
-  // ── Скачано ──
   ipcRenderer.on('update-downloaded', (_, info) => {
     if (banner) banner.style.display = 'none';
     const modal = document.getElementById('update-ready-modal');
@@ -72,7 +71,6 @@ function initUpdater() {
     if (modal) modal.classList.add('show');
   });
 
-  // ── Ошибка ──
   ipcRenderer.on('update-error', (_, msg) => {
     showNotif('Ошибка обновления: ' + msg, 'error');
     if (btnDownload) {
@@ -82,7 +80,6 @@ function initUpdater() {
     if (progressWrap) progressWrap.style.display = 'none';
   });
 
-  // ── Кнопка скачать ──
   btnDownload?.addEventListener('click', async () => {
     btnDownload.disabled    = true;
     btnDownload.textContent = 'Скачиваю...';
@@ -97,18 +94,15 @@ function initUpdater() {
     }
   });
 
-  // ── Кнопка позже ──
   btnLater?.addEventListener('click', () => {
     if (banner) banner.style.display = 'none';
     showNotif('Обновление будет установлено при следующем запуске', 'info');
   });
 
-  // ── Установить сейчас ──
   document.getElementById('update-install-btn')?.addEventListener('click', () => {
     ipcRenderer.send('update-install');
   });
 
-  // ── Установить потом ──
   document.getElementById('update-install-later')?.addEventListener('click', () => {
     const modal = document.getElementById('update-ready-modal');
     if (modal) modal.classList.remove('show');
@@ -132,12 +126,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   initNewsPage();
   initVersionsPage();
   initProfilesPage();
-  initUpdater(); // ← добавить сюда
+  initUpdater();
+  initModsPage(); // ← новый вызов
 
   await restoreSession();
   await loadVersions();
   await loadProfiles();
-  await updateUI();
+  await updateUI();  // теперь асинхронный
 });
 
 // ─── Window ───────────────────────────────────────
@@ -168,26 +163,21 @@ function switchPage(name) {
 // ═══════════════════════════════════════════════════
 
 function initProfilesPage() {
-  // Кнопка создать профиль
   document.getElementById('btn-create-profile').addEventListener('click', () => {
     openProfileModal(null);
   });
 
-  // Закрыть модалку
   document.getElementById('profile-modal-close').addEventListener('click', closeProfileModal);
   document.getElementById('pf-cancel-btn').addEventListener('click', closeProfileModal);
 
-  // Клик вне модалки
   document.getElementById('profile-modal').addEventListener('click', e => {
     if (e.target === document.getElementById('profile-modal')) {
       closeProfileModal();
     }
   });
 
-  // Сохранить профиль
   document.getElementById('pf-save-btn').addEventListener('click', saveProfile);
 
-  // Иконки
   document.querySelectorAll('.pf-icon-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.pf-icon-btn').forEach(b => b.classList.remove('selected'));
@@ -204,7 +194,6 @@ async function loadProfiles() {
   if (saved && Array.isArray(saved) && saved.length > 0) {
     profiles = saved;
   } else {
-    // Создать дефолтный профиль
     profiles = [
       {
         id:         generateId(),
@@ -221,7 +210,6 @@ async function loadProfiles() {
     await ipcRenderer.invoke('store-set', 'profiles', profiles);
   }
 
-  // Установить активный профиль
   if (activeId) {
     activeProfile = profiles.find(p => p.id === activeId) || profiles[0];
   } else {
@@ -352,7 +340,6 @@ window.deleteProfile = async function(id) {
   const profile = profiles.find(p => p.id === id);
   if (!profile) return;
 
-  // Подтверждение
   const confirmed = await showConfirm(
     `Удалить профиль "${profile.name}"?`
   );
@@ -360,7 +347,6 @@ window.deleteProfile = async function(id) {
 
   profiles = profiles.filter(p => p.id !== id);
 
-  // Если удалили активный — переключить
   if (activeProfile?.id === id) {
     activeProfile = profiles[0];
     await ipcRenderer.invoke('store-set', 'activeProfileId', activeProfile.id);
@@ -381,14 +367,12 @@ function openProfileModal(profile) {
 
   title.textContent = profile ? 'Редактировать профиль' : 'Создать профиль';
 
-  // Заполнить поля
   document.getElementById('pf-name').value       = profile?.name || '';
   document.getElementById('pf-desc').value       = profile?.desc || '';
   document.getElementById('pf-ram').value        = profile?.ram || 2048;
   document.getElementById('pf-java').value       = profile?.java || '';
   document.getElementById('pf-fullscreen').checked = profile?.fullscreen || false;
 
-  // Иконка
   const iconPreview = document.getElementById('pf-icon-preview');
   const selectedIcon = profile?.icon || '🎮';
   iconPreview.textContent = selectedIcon;
@@ -397,7 +381,6 @@ function openProfileModal(profile) {
     btn.classList.toggle('selected', btn.dataset.icon === selectedIcon);
   });
 
-  // Версии
   const sel = document.getElementById('pf-version');
   sel.innerHTML = allVersions
     .filter(v => v.type === 'release')
@@ -434,14 +417,12 @@ async function saveProfile() {
   }
 
   if (editingProfile) {
-    // Редактирование
     profiles = profiles.map(p => {
       if (p.id !== editingProfile) return p;
       return { ...p, icon, name, desc, version, ram, java, fullscreen };
     });
     showNotif(`Профиль "${name}" обновлён`, 'success');
   } else {
-    // Создание
     const newProfile = {
       id:         generateId(),
       icon, name, desc, version, ram, java, fullscreen,
@@ -449,7 +430,6 @@ async function saveProfile() {
     };
     profiles.push(newProfile);
 
-    // Если первый — сделать активным
     if (profiles.length === 1) {
       activeProfile = newProfile;
       await ipcRenderer.invoke('store-set', 'activeProfileId', newProfile.id);
@@ -460,7 +440,6 @@ async function saveProfile() {
 
   await ipcRenderer.invoke('store-set', 'profiles', profiles);
 
-  // Обновить активный если редактировали его
   if (editingProfile && activeProfile?.id === editingProfile) {
     activeProfile = profiles.find(p => p.id === editingProfile);
     updateActiveProfileBar();
@@ -490,7 +469,6 @@ async function handleLaunch() {
     if (!username) return;
   }
 
-  // Берём настройки из активного профиля или из UI
   const version    = document.getElementById('quick-version').value;
   const ram        = parseInt(document.getElementById('ram-slider').value);
   const fullscreen = activeProfile?.fullscreen ||
@@ -507,6 +485,8 @@ async function handleLaunch() {
   if (activeProfile) {
     addLog(`📋 Профиль: ${activeProfile.name}`, '');
   }
+
+  sessionStartTime = Date.now();
 
   const result = await ipcRenderer.invoke('launch-minecraft', {
     username, version, ram, fullscreen, javaPath
@@ -590,58 +570,6 @@ function getDefaultVersions() {
   ];
 }
 
-async function getSkinUrl(username) {
-  if (!username) return null;
-  if (skinCache[username]) return skinCache[username];
-
-  try {
-    // 1. Получить UUID по нику
-    const uuidRes = await fetch(`https://api.mojang.com/users/profiles/minecraft/${username}`);
-    if (!uuidRes.ok) return null;
-    const { id } = await uuidRes.json();
-
-    // 2. Получить профиль с текстурами
-    const profileRes = await fetch(`https://sessionserver.mojang.com/session/minecraft/profile/${id}`);
-    if (!profileRes.ok) return null;
-    const data = await profileRes.json();
-
-    // 3. Распарсить текстуры (base64)
-    const texturesProperty = data.properties.find(p => p.name === 'textures');
-    if (!texturesProperty) return null;
-    const textures = JSON.parse(atob(texturesProperty.value));
-    const skinUrl = textures.textures?.SKIN?.url || null;
-
-    skinCache[username] = skinUrl;
-    return skinUrl;
-  } catch (e) {
-    console.warn('Не удалось получить скин:', e.message);
-    return null;
-  }
-}
-
-function setAvatarImage(url) {
-  const avatarEls = ['profile-avatar', 'user-avatar-big'];
-  avatarEls.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
-      el.style.background = 'transparent'; // убираем фон, если был
-    }
-  });
-}
-
-function setAvatarFallback(letter) {
-  const avatarEls = ['profile-avatar', 'user-avatar-big'];
-  avatarEls.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.textContent = letter;
-      el.style.background = ''; // возвращаем стандартный фон (если определён в CSS)
-      el.innerHTML = letter; // очищаем img, если был
-    }
-  });
-}
-
 async function loadVersions() {
   showVersionsLoading();
   try {
@@ -685,7 +613,6 @@ function populateVersionSelect() {
     .map(v => `<option value="${v.id}">${v.id}${v.recommended ? ' ⭐' : ''}</option>`)
     .join('');
 
-  // Применить версию из активного профиля
   if (activeProfile?.version) sel.value = activeProfile.version;
 }
 
@@ -796,6 +723,18 @@ function initConsole() {
     isLaunching = false;
     setLaunchBtnState('idle');
     hideElement('download-progress');
+
+    if (sessionStartTime) {
+      const duration = Math.floor((Date.now() - sessionStartTime) / 60000);
+      if (duration > 0) {
+        ipcRenderer.invoke('store-get', 'totalPlayTime').then(prev => {
+          const total = (prev || 0) + duration;
+          ipcRenderer.invoke('store-set', 'totalPlayTime', total);
+        });
+      }
+      sessionStartTime = null;
+    }
+
     addLog(`■ Minecraft закрыт (код: ${code})`, code === 0 ? 'success' : 'error');
     showNotif(code === 0 ? 'Minecraft закрыт' : `Ошибка (код: ${code})`,
               code === 0 ? 'info' : 'error');
@@ -978,6 +917,7 @@ async function restoreSession() {
 // ─── Settings ─────────────────────────────────────
 function initSettings() {
   loadSavedSettings();
+  loadJavaInfo(); // ← новый вызов
 
   document.getElementById('default-ram')?.addEventListener('change', e => {
     ipcRenderer.invoke('store-set', 'defaultRam', e.target.value);
@@ -1024,38 +964,77 @@ function initSettings() {
     }
   });
 
-  async function loadJavaInfo() {
-    const javaList = await ipcRenderer.invoke('find-java');
-    const container = document.getElementById('java-detected');
-    if (!container) return;
-    if (javaList.length === 0) {
-      container.innerHTML = '<span style="color:var(--error)">❌ Java не найдена. Установите Java 8 или 17.</span>';
-    } else {
-      container.innerHTML = javaList.map(j => 
-        `<div style="font-size:13px;color:var(--text-secondary)">☕ ${j.path} — версия ${j.version}</div>`
-      ).join('');
-      // Автоматически выбрать первую подходящую (если не задана)
-      const currentJava = await ipcRenderer.invoke('store-get', 'javaPath');
-      if (!currentJava) {
-        const recommended = javaList.find(j => j.version.startsWith('17') || j.version.startsWith('1.8')) || javaList[0];
-        document.getElementById('java-path').value = recommended.path;
-        await ipcRenderer.invoke('store-set', 'javaPath', recommended.path);
-      }
-    }
-  }
-
-  // ── Темы ── добавить сюда
+  // ── Темы ──
   initThemes();
+
+  // ── Кнопка скачать Java ──
+  document.getElementById('btn-download-java')?.addEventListener('click', async () => {
+    const version = prompt('Какую версию Java скачать?\nВведите номер: 8, 11, 17, 21', '17');
+    if (!version) return;
+
+    const btn = document.getElementById('btn-download-java');
+    btn.disabled = true;
+    btn.textContent = 'Скачиваю...';
+    try {
+      const mcPath = await ipcRenderer.invoke('get-minecraft-path');
+      const javaDir = path.join(mcPath, '..', 'runtime', 'java');
+      const result = await ipcRenderer.invoke('download-java', version, javaDir);
+      if (result.success) {
+        document.getElementById('java-path').value = result.path;
+        await ipcRenderer.invoke('store-set', 'javaPath', result.path);
+        showNotif(`✅ Java ${version} установлена!`, 'success');
+        await loadJavaInfo();
+      } else {
+        showNotif('❌ Ошибка: ' + result.error, 'error');
+      }
+    } catch (e) {
+      showNotif('❌ Ошибка: ' + e.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '⬇️ Скачать Java (если не найдена)';
+    }
+  });
+}
+
+// ─── Java Finder ──────────────────────────────────
+async function loadJavaInfo() {
+  const container = document.getElementById('java-detected');
+  if (!container) return;
+  container.innerHTML = '<span class="loading-text">Поиск Java...</span>';
+
+  try {
+    const javaList = await ipcRenderer.invoke('find-java');
+    if (!javaList || javaList.length === 0) {
+      container.innerHTML = '<span style="color:var(--error)">❌ Java не найдена. Установите Java 8 или 17.</span>';
+      return;
+    }
+
+    container.innerHTML = javaList.map((j, index) => 
+      `<div style="display:flex;align-items:center;gap:8px;padding:2px 0;">
+        <span>☕</span>
+        <span style="font-family:monospace;font-size:12px;">${j.path}</span>
+        <span style="background:var(--accent-2);padding:0 8px;border-radius:4px;font-size:11px;">${j.version}</span>
+        ${index === 0 ? ' <span style="color:var(--success)">(рекомендуется)</span>' : ''}
+      </div>`
+    ).join('');
+
+    const currentJava = await ipcRenderer.invoke('store-get', 'javaPath');
+    if (!currentJava) {
+      const preferred = javaList.find(j => j.version.startsWith('17') || j.version.startsWith('1.8')) || javaList[0];
+      document.getElementById('java-path').value = preferred.path;
+      await ipcRenderer.invoke('store-set', 'javaPath', preferred.path);
+    }
+  } catch (e) {
+    container.innerHTML = '<span style="color:var(--error)">❌ Ошибка поиска Java</span>';
+  }
 }
 
 // ─── Themes ───────────────────────────────────────
 function initThemes() {
-  // Загрузить сохранённую тему при старте
   ipcRenderer.invoke('store-get', 'theme').then(theme => {
     applyTheme(theme || 'purple', false);
   });
 
-  // Клик по кнопке темы
   document.querySelectorAll('.theme-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       applyTheme(btn.dataset.theme, true);
@@ -1064,15 +1043,12 @@ function initThemes() {
 }
 
 function applyTheme(theme, save = true) {
-  // Применяем к html элементу
   document.documentElement.setAttribute('data-theme', theme);
 
-  // Обновляем активную кнопку
   document.querySelectorAll('.theme-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.theme === theme);
   });
 
-  // Сохраняем
   if (save) {
     ipcRenderer.invoke('store-set', 'theme', theme);
     showNotif('Тема изменена! 🎨', 'success');
@@ -1097,24 +1073,6 @@ async function loadSavedSettings() {
   if (fs !== undefined) { const el = document.getElementById('fullscreen-toggle'); if (el) el.checked = fs; }
   const closeEl = document.getElementById('close-launcher-toggle');
   if (closeEl) closeEl.checked = close ?? true;
-}
-
-async function getSkinUrl(username) {
-  try {
-    // 1. Получить UUID по нику
-    const res = await fetch(`https://api.mojang.com/users/profiles/minecraft/${username}`);
-    if (!res.ok) return null;
-    const { id } = await res.json();
-    // 2. Получить профиль с текстурами
-    const profileRes = await fetch(`https://sessionserver.mojang.com/session/minecraft/profile/${id}`);
-    if (!profileRes.ok) return null;
-    const data = await profileRes.json();
-    const textures = JSON.parse(atob(data.properties.find(p => p.name === 'textures').value));
-    const skinUrl = textures.textures.SKIN?.url;
-    return skinUrl || null;
-  } catch {
-    return null;
-  }
 }
 
 // ─── News ─────────────────────────────────────────
@@ -1147,7 +1105,224 @@ function initNewsPage() {
   `).join('');
 }
 
-// ─── Update UI ────────────────────────────────────
+// ═══════════════════════════════════════════════════
+// НОВЫЙ МЕНЕДЖЕР МОДОВ
+// ═══════════════════════════════════════════════════
+
+let modSearchResults = [];
+let installedMods = [];
+
+function initModsPage() {
+  const searchBtn = document.getElementById('mod-search-btn');
+  const searchInput = document.getElementById('mod-search');
+  const installedBtn = document.getElementById('mod-installed-btn');
+
+  searchBtn?.addEventListener('click', () => performModSearch(searchInput?.value));
+  searchInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') performModSearch(searchInput.value);
+  });
+  installedBtn?.addEventListener('click', toggleInstalledList);
+
+  loadInstalledMods();
+}
+
+async function performModSearch(query) {
+  if (!query || query.length < 2) {
+    showNotif('Введите хотя бы 2 символа', 'info');
+    return;
+  }
+
+  const container = document.getElementById('mods-search-results');
+  container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;">⏳ Поиск...</div>';
+
+  try {
+    const url = `https://api.modrinth.com/v2/search?query=${encodeURIComponent(query)}&limit=24`;
+    const res = await fetch(url);
+    const data = await res.json();
+    modSearchResults = data.hits || [];
+    renderModSearchResults(modSearchResults);
+  } catch (e) {
+    container.innerHTML = `<div style="grid-column:1/-1;color:var(--error);">❌ Ошибка: ${e.message}</div>`;
+  }
+}
+
+function renderModSearchResults(results) {
+  const container = document.getElementById('mods-search-results');
+  if (!results || results.length === 0) {
+    container.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-muted)">Моды не найдены</div>';
+    return;
+  }
+
+  container.innerHTML = results.map(mod => {
+    const icon = mod.icon_url || 'https://via.placeholder.com/64';
+    const latestVersion = mod.latest_version || 'latest';
+    return `
+      <div class="mod-card" style="background:var(--bg-card);border-radius:12px;padding:16px;border:1px solid var(--border);">
+        <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px;">
+          <img src="${icon}" alt="${mod.title}" style="width:48px;height:48px;border-radius:8px;object-fit:cover;">
+          <div style="flex:1;">
+            <div style="font-weight:600;">${mod.title}</div>
+            <div style="font-size:12px;color:var(--text-muted);">${mod.author}</div>
+          </div>
+        </div>
+        <div style="font-size:13px;color:var(--text-secondary);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:10px;">
+          ${mod.description || 'Нет описания'}
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;color:var(--text-muted);">⬇ ${mod.downloads || 0}</span>
+          <button class="btn-primary small mod-install-btn" data-mod-id="${mod.project_id}" data-version="${latestVersion}">
+            Установить
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  document.querySelectorAll('.mod-install-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const modId = btn.dataset.modId;
+      const version = btn.dataset.version;
+      await installMod(modId, version, e);
+    });
+  });
+}
+
+async function installMod(modId, version, event) {
+  const btn = event?.target;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳';
+  }
+
+  try {
+    const versionUrl = `https://api.modrinth.com/v2/project/${modId}/version`;
+    const res = await fetch(versionUrl);
+    const versions = await res.json();
+    const targetVersion = versions.find(v => v.version_type === 'release') || versions[0];
+    if (!targetVersion) throw new Error('Нет подходящей версии');
+    const file = targetVersion.files.find(f => f.primary);
+    if (!file) throw new Error('Файл не найден');
+
+    const result = await ipcRenderer.invoke('mods-install', modId, targetVersion.version_number, file.url);
+    if (result.success) {
+      showNotif(`✅ Мод ${modId} установлен!`, 'success');
+      loadInstalledMods();
+    } else {
+      showNotif('❌ Ошибка: ' + result.error, 'error');
+    }
+  } catch (e) {
+    showNotif('❌ Ошибка: ' + e.message, 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Установить';
+    }
+  }
+}
+
+async function loadInstalledMods() {
+  try {
+    const list = await ipcRenderer.invoke('mods-list-installed');
+    installedMods = list;
+    renderInstalledMods(list);
+  } catch (e) {
+    console.error('Ошибка загрузки модов:', e);
+  }
+}
+
+function renderInstalledMods(list) {
+  const grid = document.getElementById('mods-installed-grid');
+  if (!grid) return;
+  if (!list || list.length === 0) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-muted)">Моды не установлены</div>';
+    return;
+  }
+  grid.innerHTML = list.map(mod => `
+    <div style="background:var(--bg-card);border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-family:monospace;font-size:13px;">${mod.name}</span>
+      <button class="btn-danger small mod-uninstall-btn" data-filename="${mod.name}">🗑</button>
+    </div>
+  `).join('');
+
+  document.querySelectorAll('.mod-uninstall-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const filename = btn.dataset.filename;
+      if (!confirm(`Удалить мод "${filename}"?`)) return;
+      const result = await ipcRenderer.invoke('mods-uninstall', filename);
+      if (result.success) {
+        showNotif(`✅ Мод удалён`, 'info');
+        loadInstalledMods();
+      } else {
+        showNotif('❌ Ошибка: ' + result.error, 'error');
+      }
+    });
+  });
+}
+
+function toggleInstalledList() {
+  const searchResults = document.getElementById('mods-search-results');
+  const installedList = document.getElementById('mods-installed-list');
+  if (!searchResults || !installedList) return;
+
+  const isHidden = installedList.style.display === 'none';
+  searchResults.style.display = isHidden ? 'none' : 'grid';
+  installedList.style.display = isHidden ? 'block' : 'none';
+  if (isHidden) loadInstalledMods();
+}
+
+// ═══════════════════════════════════════════════════
+// СКИНЫ (обновлённый updateUI)
+// ═══════════════════════════════════════════════════
+
+async function getSkinUrl(username) {
+  if (!username) return null;
+  if (skinCache[username]) return skinCache[username];
+
+  try {
+    const uuidRes = await fetch(`https://api.mojang.com/users/profiles/minecraft/${username}`);
+    if (!uuidRes.ok) return null;
+    const { id } = await uuidRes.json();
+
+    const profileRes = await fetch(`https://sessionserver.mojang.com/session/minecraft/profile/${id}`);
+    if (!profileRes.ok) return null;
+    const data = await profileRes.json();
+
+    const texturesProperty = data.properties.find(p => p.name === 'textures');
+    if (!texturesProperty) return null;
+    const textures = JSON.parse(atob(texturesProperty.value));
+    const skinUrl = textures.textures?.SKIN?.url || null;
+
+    skinCache[username] = skinUrl;
+    return skinUrl;
+  } catch (e) {
+    console.warn('Не удалось получить скин:', e.message);
+    return null;
+  }
+}
+
+function setAvatarImage(url) {
+  const avatarEls = ['profile-avatar', 'user-avatar-big'];
+  avatarEls.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+      el.style.background = 'transparent';
+    }
+  });
+}
+
+function setAvatarFallback(letter) {
+  const avatarEls = ['profile-avatar', 'user-avatar-big'];
+  avatarEls.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.textContent = letter;
+      el.style.background = '';
+      el.innerHTML = letter;
+    }
+  });
+}
+
 async function updateUI() {
   const logged    = !!currentUser;
   const loggedOut = document.getElementById('auth-logged-out');
@@ -1157,13 +1332,12 @@ async function updateUI() {
 
   const letter = logged ? currentUser.username[0].toUpperCase() : '?';
 
-  // Сначала устанавливаем текстовые поля (синхронно)
   const els = {
-    'profile-avatar':     letter, // временно, потом обновим
+    'profile-avatar':     letter,
     'profile-name':       logged ? currentUser.username : 'Не войдено',
     'profile-status':     !logged ? 'Нажмите для входа' :
                           currentUser.offline ? 'Оффлайн режим' : 'CosmoLauncher',
-    'user-avatar-big':    letter, // временно
+    'user-avatar-big':    letter,
     'user-name-big':      logged ? currentUser.username : '',
     'user-email-display': logged ? (currentUser.email || 'Оффлайн режим') : '',
   };
@@ -1172,7 +1346,6 @@ async function updateUI() {
     if (el) el.textContent = val;
   });
 
-  // Теперь обновляем аватар (асинхронно)
   await updateAvatar();
 }
 
@@ -1182,12 +1355,10 @@ async function updateAvatar() {
     return;
   }
 
-  // Попытка получить скин
   const skinUrl = await getSkinUrl(currentUser.username);
   if (skinUrl) {
     setAvatarImage(skinUrl);
   } else {
-    // Если скин не найден — показываем букву
     const letter = currentUser.username[0].toUpperCase();
     setAvatarFallback(letter);
   }
@@ -1208,7 +1379,6 @@ function escHtml(str) {
 
 function showConfirm(msg) {
   return new Promise(resolve => {
-    // Простой confirm — можно заменить на красивую модалку потом
     resolve(window.confirm(msg));
   });
 }
