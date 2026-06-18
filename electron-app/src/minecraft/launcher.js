@@ -7,6 +7,7 @@ const { spawn } = require('child_process');
 
 const launcher = new Client();
 
+// ─── ЕДИНЫЙ ПУТЬ К ИГРЕ ──────────────────────────
 function getMinecraftPath() {
   const home = os.homedir();
   if (process.platform === 'win32') {
@@ -18,7 +19,7 @@ function getMinecraftPath() {
   }
 }
 
-// ─── Утилита для запуска Java с аргументами ──────
+// ─── Утилита для запуска Java ─────────────────────
 function runJava(javaPath, args, options = {}) {
   return new Promise((resolve, reject) => {
     const java = javaPath || 'java';
@@ -49,6 +50,14 @@ function runJava(javaPath, args, options = {}) {
 
 // ─── Установка Forge ──────────────────────────────
 async function installForge(minecraftPath, version, loaderVersion, javaPath, onLog) {
+  // ── ВРЕМЕННОЕ ИСПРАВЛЕНИЕ ПУТИ ──
+  if (minecraftPath.includes('.cosmolauchner')) {
+    minecraftPath = minecraftPath.replace('.cosmolauchner', '.cosmolauncher');
+    onLog && onLog({ type: 'warn', message: `⚠️ Путь исправлен на: ${minecraftPath}` });
+  }
+
+  onLog && onLog({ type: 'info', message: `📁 Путь к игре: ${minecraftPath}` });
+
   // 1. Проверяем наличие ванильного клиента
   onLog && onLog({ type: 'info', message: `Проверяем наличие клиента ${version}...` });
   const versionDir = path.join(minecraftPath, 'versions', version);
@@ -74,14 +83,6 @@ async function installForge(minecraftPath, version, loaderVersion, javaPath, onL
     }
   } else {
     onLog && onLog({ type: 'info', message: `Клиент ${version} уже есть` });
-  }
-
-  // Проверяем содержимое папки версии
-  try {
-    const files = fs.readdirSync(versionDir);
-    onLog && onLog({ type: 'info', message: `Содержимое папки ${versionDir}: ${files.join(', ')}` });
-  } catch(e) {
-    onLog && onLog({ type: 'warn', message: `Не удалось прочитать папку версии: ${e.message}` });
   }
 
   // 2. Определяем версию Forge
@@ -207,17 +208,18 @@ async function installForge(minecraftPath, version, loaderVersion, javaPath, onL
 
   try {
     const result = await runJava(java, args, { timeout: 180000 });
-    onLog && onLog({ type: 'info', message: 'Forge Installer stdout: ' + (result.stdout || '(empty)') });
+    onLog && onLog({ type: 'info', message: 'STDOUT: ' + (result.stdout || '(empty)') });
     if (result.stderr) {
-      onLog && onLog({ type: 'error', message: 'Forge Installer stderr: ' + result.stderr });
+      onLog && onLog({ type: 'error', message: 'STDERR: ' + result.stderr });
       if (result.stderr.includes('ERROR') || result.stderr.includes('Exception')) {
         throw new Error(result.stderr);
       }
     }
+    onLog && onLog({ type: 'info', message: '✅ Forge установлен' });
   } catch (e) {
     onLog && onLog({ type: 'error', message: `Ошибка установки: ${e.message}` });
-    if (e.stderr) onLog && onLog({ type: 'error', message: `Детали stderr: ${e.stderr}` });
-    if (e.stdout) onLog && onLog({ type: 'info', message: `Вывод stdout: ${e.stdout}` });
+    if (e.stderr) onLog && onLog({ type: 'error', message: `STDERR детали: ${e.stderr}` });
+    if (e.stdout) onLog && onLog({ type: 'info', message: `STDOUT детали: ${e.stdout}` });
     throw new Error(`Не удалось установить Forge: ${e.message}`);
   } finally {
     if (fs.existsSync(installerPath)) {
