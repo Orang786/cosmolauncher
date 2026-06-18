@@ -45,48 +45,96 @@ async function installForge(minecraftPath, version, loaderVersion, onLog) {
   if (!selectedVersion || selectedVersion === 'latest') {
     onLog && onLog({ type: 'info', message: `Определяем последнюю версию Forge для ${version}...` });
     let versions = [];
+    let source = '';
+
     // Попытка 1: официальный API Forge (иногда не работает)
     try {
       const url = `https://files.minecraftforge.net/maven/net/minecraftforge/forge/index_${version}.json`;
       const response = await axios.get(url, { timeout: 5000 });
       const data = response.data;
       versions = data.number || [];
-      onLog && onLog({ type: 'info', message: `Получено ${versions.length} версий через официальный API` });
+      source = 'официальный API';
+      onLog && onLog({ type: 'info', message: `Получено ${versions.length} версий через ${source}` });
     } catch (e) {
       onLog && onLog({ type: 'warn', message: `Официальный API Forge недоступен: ${e.message}` });
+      
       // Попытка 2: BMCLAPI (зеркало)
       try {
         const url = `https://bmclapi2.bangbang93.com/forge/minecraft/${version}`;
         const response = await axios.get(url, { timeout: 5000 });
-        versions = response.data || [];
-        onLog && onLog({ type: 'info', message: `Получено ${versions.length} версий через BMCLAPI` });
+        // BMCLAPI возвращает массив объектов, у каждого есть поле 'version'
+        const rawData = response.data;
+        if (Array.isArray(rawData)) {
+          versions = rawData.map(item => item.version).filter(v => v);
+          source = 'BMCLAPI';
+          onLog && onLog({ type: 'info', message: `Получено ${versions.length} версий через ${source}` });
+        } else {
+          throw new Error('Неверный формат данных от BMCLAPI');
+        }
       } catch (e2) {
         onLog && onLog({ type: 'warn', message: `BMCLAPI недоступен: ${e2.message}` });
-        // Попытка 3: встроенный fallback-список для популярных версий
-        const fallback = {
-          '1.20.4': ['47.2.0', '47.1.3'],
-          '1.20.2': ['47.1.0'],
-          '1.20.1': ['47.2.0', '47.1.3'],
-          '1.19.4': ['45.2.0'],
-          '1.18.2': ['40.2.10', '40.2.0'],
-          '1.17.1': ['37.1.1'],
-          '1.16.5': ['36.2.34', '36.2.0'],
-          '1.15.2': ['31.2.0'],
-          '1.14.4': ['28.2.0'],
-          '1.12.2': ['14.23.5.2859', '14.23.5.2847'],
-          '1.8.9': ['11.15.1.2318'],
-        };
-        if (fallback[version]) {
-          versions = fallback[version];
-          onLog && onLog({ type: 'info', message: `Используем встроенный список версий: ${versions.join(', ')}` });
-        } else {
-          throw new Error(`Нет известных версий Forge для ${version}`);
+        
+        // Попытка 3: парсинг официальной страницы Forge
+        try {
+          const url = `https://files.minecraftforge.net/net/minecraftforge/forge/`;
+          const response = await axios.get(url, { timeout: 10000 });
+          const html = response.data;
+          // Ищем таблицу с версиями для конкретной версии MC
+          // Шаблон: <a href="index_${version}.html"> или просто версии в таблице
+          // Упрощённо: ищем строки вида "forge-${version}-XXX-installer.jar"
+          const regex = new RegExp(`forge-${version}-([0-9.]+)-installer\\.jar`, 'g');
+          const matches = [...html.matchAll(regex)];
+          if (matches.length > 0) {
+            versions = matches.map(m => m[1]);
+            source = 'парсинг страницы Forge';
+            onLog && onLog({ type: 'info', message: `Получено ${versions.length} версий через ${source}` });
+          } else {
+            throw new Error(`Не удалось найти версии Forge для ${version} на странице`);
+          }
+        } catch (e3) {
+          onLog && onLog({ type: 'warn', message: `Парсинг страницы Forge не удался: ${e3.message}` });
+          
+          // Попытка 4: встроенный fallback-список для популярных версий
+          const fallback = {
+            '1.20.4': ['47.2.0', '47.1.3'],
+            '1.20.2': ['47.1.0'],
+            '1.20.1': ['47.2.0', '47.1.3'],
+            '1.19.4': ['45.2.0'],
+            '1.18.2': ['40.2.10', '40.2.0'],
+            '1.17.1': ['37.1.1'],
+            '1.16.5': ['36.2.34', '36.2.0'],
+            '1.15.2': ['31.2.0'],
+            '1.14.4': ['28.2.0'],
+            '1.12.2': ['14.23.5.2859', '14.23.5.2847'],
+            '1.8.9': ['11.15.1.2318'],
+          };
+          if (fallback[version]) {
+            versions = fallback[version];
+            source = 'встроенный список';
+            onLog && onLog({ type: 'info', message: `Используем ${source}: ${versions.join(', ')}` });
+          } else {
+            throw new Error(`Нет известных версий Forge для ${version}`);
+          }
         }
       }
     }
+
     if (!versions || versions.length === 0) {
       throw new Error(`Не найдено ни одной версии Forge для ${version}`);
     }
+
+    // Сортируем версии по убыванию (чтобы последняя была первой)
+    versions.sort((a, b) => {
+      const partsA = a.split('.').map(Number);
+      const partsB = b.split('.').map(Number);
+      for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+        const valA = partsA[i] || 0;
+        const valB = partsB[i] || 0;
+        if (valA !== valB) return valB - valA;
+      }
+      return 0;
+    });
+
     selectedVersion = versions[0]; // берём первую (самую свежую)
     onLog && onLog({ type: 'info', message: `Выбрана версия Forge: ${selectedVersion}` });
   }
