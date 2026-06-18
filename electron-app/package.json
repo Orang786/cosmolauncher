@@ -1,31 +1,99 @@
 {
   "name": "cosmolauncher",
   "version": "1.0.0",
+  "author": {
+    "name": "CosmoLauncher",
+    "email": "support@cosmolauncher.com"
+  },
   "description": "CosmoLauncher — Minecraft Launcher",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder"
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux",
+    "build:mac": "electron-builder --mac"
   },
   "dependencies": {
-    "minecraft-launcher-core": "^3.6.1",
     "axios": "^1.6.0",
     "electron-store": "^8.1.0",
+    "minecraft-launcher-core": "^3.6.1",
     "node-fetch": "^2.7.0"
   },
   "devDependencies": {
     "electron": "^28.0.0",
-    "electron-builder": "^24.9.1"
+    "electron-builder": "^24.9.1",
+    "electron-icon-builder": "^2.0.1",
+    "png2icons": "^2.0.1"
   },
   "build": {
     "appId": "com.cosmolauncher.app",
     "productName": "CosmoLauncher",
-    "win": {
-      "target": "nsis",
-      "icon": "assets/icon.ico"
+    "copyright": "Copyright © 2024 CosmoLauncher",
+    "asar": true,
+
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
     },
+
+    "files": [
+      "src/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "requestedExecutionLevel": "asInvoker"
+    },
+
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "CosmoLauncher",
+      "runAfterFinish": true,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false
+    },
+
     "linux": {
-      "target": "AppImage"
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        }
+      ],
+      "category": "Game"
+    },
+
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64"]
+        }
+      ],
+      "category": "public.app-category.games"
+    },
+
+    "publish": {
+      "provider": "github",
+      "owner": "ТУТ_ТВОЙ_НИКНЕЙМ",
+      "repo": "cosmolauncher"
     }
   }
 }

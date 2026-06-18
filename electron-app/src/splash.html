@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      width: 400px;
+      height: 250px;
+      background: #0d0a1a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Segoe UI', sans-serif;
+      overflow: hidden;
+      border-radius: 16px;
+      user-select: none;
+    }
+
+    .bg-glow {
+      position: absolute;
+      width: 300px; height: 300px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(124,58,237,0.15), transparent 70%);
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+      50%       { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+    }
+
+    .logo {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .logo-icon {
+      font-size: 52px;
+      background: linear-gradient(135deg, #7c3aed, #a855f7, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: spin 8s linear infinite;
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      0%   { filter: hue-rotate(0deg); }
+      100% { filter: hue-rotate(360deg); }
+    }
+
+    .logo-text {
+      display: block;
+      font-size: 22px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #a855f7, #c084fc);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-top: 6px;
+      letter-spacing: 1px;
+    }
+
+    .logo-sub {
+      display: block;
+      font-size: 11px;
+      color: #5a4f7a;
+      margin-top: 4px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .progress-wrap {
+      position: relative;
+      z-index: 1;
+      width: 260px;
+    }
+
+    .progress-bar-bg {
+      height: 3px;
+      background: rgba(124,58,237,0.15);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #7c3aed, #a855f7);
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill::after {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%; right: 0; bottom: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+      animation: shimmer 1s infinite;
+    }
+
+    @keyframes shimmer {
+      to { left: 100%; }
+    }
+
+    .status-text {
+      text-align: center;
+      font-size: 11px;
+      color: #5a4f7a;
+      letter-spacing: 0.5px;
+    }
+
+    .version {
+      position: absolute;
+      bottom: 14px;
+      right: 16px;
+      font-size: 10px;
+      color: #3a3050;
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-glow"></div>
+
+  <div class="logo">
+    <span class="logo-icon">✦</span>
+    <span class="logo-text">CosmoLauncher</span>
+    <span class="logo-sub">Minecraft Launcher</span>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" id="fill"></div>
+    </div>
+    <div class="status-text" id="status">Запуск...</div>
+  </div>
+
+  <div class="version">v1.0.0</div>
+
+  <script>
+    const fill   = document.getElementById('fill');
+    const status = document.getElementById('status');
+
+    const steps = [
+      { pct: 15, text: 'Инициализация...' },
+      { pct: 35, text: 'Загрузка компонентов...' },
+      { pct: 60, text: 'Подключение к серверу...' },
+      { pct: 80, text: 'Подготовка интерфейса...' },
+      { pct: 100, text: 'Готово!' },
+    ];
+
+    let i = 0;
+    const interval = setInterval(() => {
+      if (i >= steps.length) {
+        clearInterval(interval);
+        return;
+      }
+      fill.style.width   = steps[i].pct + '%';
+      status.textContent = steps[i].text;
+      i++;
+    }, 400);
+  </script>
+</body>
+</html>
