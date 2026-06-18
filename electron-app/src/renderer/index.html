@@ -88,6 +88,14 @@
           </svg>
           <span>Новости</span>
         </button>
+
+        <!-- Новая кнопка "Моды" -->
+        <button class="nav-item" data-page="mods">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+          <span>Моды</span>
+        </button>
       </nav>
 
       <div class="sidebar-profile" id="sidebar-profile">
@@ -306,6 +314,19 @@
               <label>Путь к Java</label>
               <input type="text" id="java-path" class="input-styled" placeholder="java">
             </div>
+            <!-- Блок для отображения найденных Java -->
+            <div class="form-group">
+              <label>Обнаруженные Java</label>
+              <div id="java-detected" style="font-size:13px;color:var(--text-secondary);padding:4px 0;">
+                <span class="loading-text">Поиск Java...</span>
+              </div>
+            </div>
+            <!-- Кнопка скачивания Java -->
+            <div class="form-group">
+              <button class="btn-secondary small" id="btn-download-java" style="margin-top:4px;">
+                ⬇️ Скачать Java (если не найдена)
+              </button>
+            </div>
             <div class="form-group">
               <label>ОЗУ по умолчанию</label>
               <select class="select-styled" id="default-ram">
@@ -469,6 +490,30 @@
         <div class="news-grid" id="news-grid"></div>
       </section>
 
+      <!-- ═══ МОДЫ ═══ -->
+      <section class="page" id="page-mods">
+        <h2 class="page-title">Менеджер модов</h2>
+
+        <div class="mods-toolbar" style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:200px;">
+            <input type="text" id="mod-search" class="input-styled" placeholder="🔍 Поиск модов... (например: sodium)">
+          </div>
+          <button class="btn-primary" id="mod-search-btn">Найти</button>
+          <button class="btn-secondary" id="mod-installed-btn">📦 Установленные</button>
+        </div>
+
+        <div id="mods-container">
+          <div id="mods-search-results" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;">
+            <!-- Результаты поиска -->
+          </div>
+          <div id="mods-installed-list" style="display:none;margin-top:16px;">
+            <h3 style="margin-bottom:12px;">Установленные моды</h3>
+            <div id="mods-installed-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;">
+            </div>
+          </div>
+        </div>
+      </section>
+
     </main>
   </div>
 
@@ -554,6 +599,7 @@
           <input type="text" id="pf-java" class="input-styled" placeholder="java">
         </div>
 
+        <!-- НОВЫЕ ПОЛЯ ДЛЯ ЗАГРУЗЧИКОВ -->
         <div class="form-group">
           <label>Загрузчик</label>
           <select id="pf-loader" class="select-styled">
