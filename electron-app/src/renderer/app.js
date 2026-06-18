@@ -814,6 +814,7 @@ async function restoreSession() {
 // ─── Settings ─────────────────────────────────────
 function initSettings() {
   loadSavedSettings();
+  initThemes();
 
   document.getElementById('default-ram')?.addEventListener('change', e => {
     ipcRenderer.invoke('store-set', 'defaultRam', e.target.value);
@@ -855,6 +856,37 @@ function initSettings() {
       setBtn(btn, 'Проверить обновления', false);
     }
   });
+}
+
+// ─── Themes ───────────────────────────────────────
+function initThemes() {
+  // Загрузить сохранённую тему
+  ipcRenderer.invoke('store-get', 'theme').then(theme => {
+    if (theme) applyTheme(theme, false);
+  });
+
+  // Клик по теме
+  document.querySelectorAll('.theme-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      applyTheme(btn.dataset.theme, true);
+    });
+  });
+}
+
+function applyTheme(theme, save = true) {
+  // Применить к html
+  document.documentElement.setAttribute('data-theme', theme);
+
+  // Обновить активную кнопку
+  document.querySelectorAll('.theme-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.theme === theme);
+  });
+
+  // Сохранить
+  if (save) {
+    ipcRenderer.invoke('store-set', 'theme', theme);
+    showNotif(`Тема изменена! 🎨`, 'success');
+  }
 }
 
 async function loadSavedSettings() {
