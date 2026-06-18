@@ -21,25 +21,7 @@ function getMinecraftPath() {
 }
 
 // ─── Установка Forge ──────────────────────────────
-async function getLatestForgeVersion(mcVersion) {
-  try {
-    // Используем общий JSON со всеми версиями
-    const url = 'https://files.minecraftforge.net/net/minecraftforge/forge/json';
-    const response = await axios.get(url, { timeout: 15000 });
-    const data = response.data;
-    // data — массив объектов { mcversion, version, ... }
-    const versions = data
-      .filter(item => item.mcversion === mcVersion)
-      .sort((a, b) => b.version.localeCompare(a.version, undefined, { numeric: true }));
-    if (versions.length === 0) return null;
-    return versions[0].version;
-  } catch (e) {
-    console.error('Ошибка получения версий Forge:', e);
-    return null;
-  }
-}
-
-async function installForge(minecraftPath, version, loaderVersion, onLog) {
+async function installForge(minecraftPath, version, loaderVersion, javaPath, onLog) {
   // Если loaderVersion не указан или 'latest', пытаемся получить последнюю версию
   let selectedVersion = loaderVersion;
   if (!selectedVersion || selectedVersion === 'latest') {
@@ -62,7 +44,6 @@ async function installForge(minecraftPath, version, loaderVersion, onLog) {
       try {
         const url = `https://bmclapi2.bangbang93.com/forge/minecraft/${version}`;
         const response = await axios.get(url, { timeout: 5000 });
-        // BMCLAPI возвращает массив объектов, у каждого есть поле 'version'
         const rawData = response.data;
         if (Array.isArray(rawData)) {
           versions = rawData.map(item => item.version).filter(v => v);
@@ -79,9 +60,6 @@ async function installForge(minecraftPath, version, loaderVersion, onLog) {
           const url = `https://files.minecraftforge.net/net/minecraftforge/forge/`;
           const response = await axios.get(url, { timeout: 10000 });
           const html = response.data;
-          // Ищем таблицу с версиями для конкретной версии MC
-          // Шаблон: <a href="index_${version}.html"> или просто версии в таблице
-          // Упрощённо: ищем строки вида "forge-${version}-XXX-installer.jar"
           const regex = new RegExp(`forge-${version}-([0-9.]+)-installer\\.jar`, 'g');
           const matches = [...html.matchAll(regex)];
           if (matches.length > 0) {
@@ -94,7 +72,7 @@ async function installForge(minecraftPath, version, loaderVersion, onLog) {
         } catch (e3) {
           onLog && onLog({ type: 'warn', message: `Парсинг страницы Forge не удался: ${e3.message}` });
           
-          // Попытка 4: встроенный fallback-список для популярных версий
+          // Попытка 4: встроенный fallback-список
           const fallback = {
             '1.20.4': ['47.2.0', '47.1.3'],
             '1.20.2': ['47.1.0'],
@@ -123,7 +101,7 @@ async function installForge(minecraftPath, version, loaderVersion, onLog) {
       throw new Error(`Не найдено ни одной версии Forge для ${version}`);
     }
 
-    // Сортируем версии по убыванию (чтобы последняя была первой)
+    // Сортируем версии по убыванию
     versions.sort((a, b) => {
       const partsA = a.split('.').map(Number);
       const partsB = b.split('.').map(Number);
@@ -135,7 +113,7 @@ async function installForge(minecraftPath, version, loaderVersion, onLog) {
       return 0;
     });
 
-    selectedVersion = versions[0]; // берём первую (самую свежую)
+    selectedVersion = versions[0];
     onLog && onLog({ type: 'info', message: `Выбрана версия Forge: ${selectedVersion}` });
   }
 
@@ -169,67 +147,84 @@ async function installForge(minecraftPath, version, loaderVersion, onLog) {
   }
 
   onLog && onLog({ type: 'info', message: 'Устанавливаем Forge...' });
-  const java = process.platform === 'win32' ? 'java' : 'java';
-  const cmd = `"${java}" -jar "${installerPath}" --installClient "${minecraftPath}"`;
-  const { stdout, stderr } = await execPromise(cmd);
-  if (stderr) onLog && onLog({ type: 'error', message: stderr });
-  onLog && onLog({ type: 'info', message: stdout || 'Forge установлен' });
 
-  fs.unlinkSync(installerPath);
+  // Определяем путь к Java
+  const java = javaPath || 'java';
+  // Экранируем пути кавычками для Windows
+  const quotedInstaller = `"${installerPath}"`;
+  const quotedMinecraftPath = `"${minecraftPath}"`;
+  const cmd = `"${java}" -jar ${quotedInstaller} --installClient ${quotedMinecraftPath}`;
+  
+  onLog && onLog({ type: 'debug', message: `Команда: ${cmd}` });
+
+  try {
+    const { stdout, stderr } = await execPromise(cmd, { timeout: 120000 });
+    if (stderr) onLog && onLog({ type: 'error', message: stderr });
+    onLog && onLog({ type: 'info', message: stdout || 'Forge установлен' });
+  } catch (e) {
+    onLog && onLog({ type: 'error', message: `Ошибка выполнения: ${e.message}` });
+    throw new Error(`Не удалось запустить установщик Forge: ${e.message}`);
+  } finally {
+    if (fs.existsSync(installerPath)) {
+      fs.unlinkSync(installerPath);
+    }
+  }
+
   return `forge-${forgeVersion}`;
 }
 
 // ─── Установка Fabric ─────────────────────────────
-async function installFabric(minecraftPath, version, loaderVersion, onLog) {
-  let actualLoaderVersion = loaderVersion;
-  if (!loaderVersion || loaderVersion === 'latest') {
-    try {
-      const response = await axios.get(`https://meta.fabricmc.net/v2/versions/loader/${version}`);
-      const data = response.data;
-      if (data.length === 0) throw new Error('Нет доступных версий Fabric для ' + version);
-      actualLoaderVersion = data[0].loader.version; // первая (самая свежая)
-      onLog && onLog({ type: 'info', message: `Выбрана версия Fabric: ${actualLoaderVersion}` });
-    } catch (e) {
-      onLog && onLog({ type: 'error', message: 'Не удалось получить список версий Fabric: ' + e.message });
-      throw new Error('Не удалось определить последнюю версию Fabric для ' + version);
-    }
-  }
-
+async function installFabric(minecraftPath, version, loaderVersion, javaPath, onLog) {
   const installerUrl = 'https://maven.fabricmc.net/net/fabricmc/fabric-installer/1.0.1/fabric-installer-1.0.1.jar';
   const installerPath = path.join(minecraftPath, 'fabric-installer.jar');
-  const fabricDir = path.join(minecraftPath, 'versions', `fabric-loader-${actualLoaderVersion}-${version}`);
+  const fabricDir = path.join(minecraftPath, 'versions', `fabric-loader-${loaderVersion}-${version}`);
 
   if (fs.existsSync(fabricDir)) {
     onLog && onLog({ type: 'info', message: 'Fabric уже установлен' });
-    return `fabric-loader-${actualLoaderVersion}-${version}`;
+    return `fabric-loader-${loaderVersion}-${version}`;
   }
 
   onLog && onLog({ type: 'info', message: 'Скачиваем Fabric Installer...' });
-  const response = await axios({
-    method: 'GET',
-    url: installerUrl,
-    responseType: 'stream',
-    timeout: 30000,
-  });
-  const writer = fs.createWriteStream(installerPath);
-  response.data.pipe(writer);
-  await new Promise((resolve, reject) => {
-    writer.on('finish', resolve);
-    writer.on('error', reject);
-  });
+  try {
+    const response = await axios({
+      method: 'GET',
+      url: installerUrl,
+      responseType: 'stream',
+      timeout: 30000,
+    });
+    const writer = fs.createWriteStream(installerPath);
+    response.data.pipe(writer);
+    await new Promise((resolve, reject) => {
+      writer.on('finish', resolve);
+      writer.on('error', reject);
+    });
+  } catch (e) {
+    onLog && onLog({ type: 'error', message: `Ошибка скачивания Fabric: ${e.message}` });
+    throw new Error(`Не удалось скачать Fabric: ${e.message}`);
+  }
 
   onLog && onLog({ type: 'info', message: 'Устанавливаем Fabric...' });
-  const java = process.platform === 'win32' ? 'java' : 'java';
-  const cmd = `"${java}" -jar "${installerPath}" client -dir "${minecraftPath}" -mcversion "${version}" -loader "${actualLoaderVersion}"`;
-  const { stdout, stderr } = await execPromise(cmd);
-  if (stderr) onLog && onLog({ type: 'error', message: stderr });
-  onLog && onLog({ type: 'info', message: stdout || 'Fabric установлен' });
+  const java = javaPath || 'java';
+  const cmd = `"${java}" -jar "${installerPath}" client -dir "${minecraftPath}" -mcversion "${version}" -loader "${loaderVersion}"`;
+  onLog && onLog({ type: 'debug', message: `Команда: ${cmd}` });
 
-  fs.unlinkSync(installerPath);
-  return `fabric-loader-${actualLoaderVersion}-${version}`;
+  try {
+    const { stdout, stderr } = await execPromise(cmd, { timeout: 120000 });
+    if (stderr) onLog && onLog({ type: 'error', message: stderr });
+    onLog && onLog({ type: 'info', message: stdout || 'Fabric установлен' });
+  } catch (e) {
+    onLog && onLog({ type: 'error', message: `Ошибка выполнения: ${e.message}` });
+    throw new Error(`Не удалось запустить установщик Fabric: ${e.message}`);
+  } finally {
+    if (fs.existsSync(installerPath)) {
+      fs.unlinkSync(installerPath);
+    }
+  }
+
+  return `fabric-loader-${loaderVersion}-${version}`;
 }
 
-// ─── Установка OptiFine (в папку mods) ────────────
+// ─── Установка OptiFine ──────────────────────────
 async function installOptiFine(minecraftPath, version, optifineVersion, onLog) {
   const optifineFile = `OptiFine_${version}_${optifineVersion}.jar`;
   const modsDir = path.join(minecraftPath, 'mods');
@@ -242,7 +237,6 @@ async function installOptiFine(minecraftPath, version, optifineVersion, onLog) {
   }
 
   onLog && onLog({ type: 'info', message: `Скачиваем OptiFine ${optifineVersion}...` });
-  // Используем зеркало (можно заменить на более стабильное)
   const mirrorUrl = `https://optifine.net/downloads/optifine/${optifineFile}`;
   try {
     const response = await axios({
@@ -261,7 +255,7 @@ async function installOptiFine(minecraftPath, version, optifineVersion, onLog) {
     onLog && onLog({ type: 'info', message: 'OptiFine установлен в моды' });
     return targetPath;
   } catch (e) {
-    onLog && onLog({ type: 'error', message: 'Не удалось скачать OptiFine: ' + e.message });
+    onLog && onLog({ type: 'error', message: `Не удалось скачать OptiFine: ${e.message}` });
     throw new Error('OptiFine скачать не удалось, попробуйте установить вручную');
   }
 }
@@ -282,17 +276,17 @@ async function launchMinecraft(options, onLog, onClose) {
     // Установка загрузчиков
     if (loader && loader !== 'vanilla') {
       if (loader === 'forge' || loader === 'forge+optifine') {
-        const forgeVersion = await installForge(rootPath, version, loaderVersion, onLog);
+        const forgeVersion = await installForge(rootPath, version, loaderVersion || 'latest', javaPath, onLog);
         actualVersion = forgeVersion;
       } else if (loader === 'fabric' || loader === 'fabric+optifine') {
-        const fabricVersion = await installFabric(rootPath, version, loaderVersion, onLog);
+        const fabricVersion = await installFabric(rootPath, version, loaderVersion || 'latest', javaPath, onLog);
         actualVersion = fabricVersion;
       }
 
       // OptiFine
       if (loader === 'forge+optifine' || loader === 'fabric+optifine') {
         if (loader === 'fabric+optifine') {
-          // Скачиваем OptiFabric как мод
+          // OptiFabric
           const optifabricUrl = 'https://maven.terraformersmc.com/releases/net/terraformersmc/optifabric/1.13.24/optifabric-1.13.24.jar';
           const modsDir = path.join(rootPath, 'mods');
           if (!fs.existsSync(modsDir)) fs.mkdirSync(modsDir, { recursive: true });
