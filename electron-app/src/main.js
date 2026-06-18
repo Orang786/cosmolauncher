@@ -233,6 +233,36 @@ ipcMain.handle('browse-java', async () => {
   return null;
 });
 
+// ─── IPC — Загрузчики ─────────────────────────────
+ipcMain.handle('get-forge-versions', async (_, mcVersion) => {
+  try {
+    // Используем API Forge для получения списка версий
+    const url = `https://files.minecraftforge.net/maven/net/minecraftforge/forge/index_${mcVersion}.json`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Не удалось получить версии Forge');
+    const data = await response.json();
+    const versions = data.number || [];
+    return versions.map(v => ({ version: v, url: `https://files.minecraftforge.net/maven/net/minecraftforge/forge/${mcVersion}-${v}/forge-${mcVersion}-${v}-installer.jar` }));
+  } catch (e) {
+    console.error('Ошибка получения версий Forge:', e);
+    return [];
+  }
+});
+
+ipcMain.handle('get-fabric-versions', async (_, mcVersion) => {
+  try {
+    // Используем Fabric Meta API
+    const url = `https://meta.fabricmc.net/v2/versions/loader/${mcVersion}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Не удалось получить версии Fabric');
+    const data = await response.json();
+    return data.map(item => ({ version: item.loader.version }));
+  } catch (e) {
+    console.error('Ошибка получения версий Fabric:', e);
+    return [];
+  }
+});
+
 // ═══════════════════════════════════════════════════
 // НОВЫЙ JAVA МЕНЕДЖЕР
 // ═══════════════════════════════════════════════════

@@ -554,6 +554,28 @@
           <input type="text" id="pf-java" class="input-styled" placeholder="java">
         </div>
 
+        <div class="form-group">
+          <label>Загрузчик</label>
+          <select id="pf-loader" class="select-styled">
+            <option value="vanilla">Ванильный</option>
+            <option value="forge">Forge</option>
+            <option value="fabric">Fabric</option>
+            <option value="forge+optifine">Forge + OptiFine</option>
+            <option value="fabric+optifine">Fabric + OptiFine</option>
+          </select>
+        </div>
+        <div class="form-group" id="pf-loader-version-group">
+          <label>Версия загрузчика</label>
+          <input type="text" id="pf-loader-version" class="input-styled" placeholder="Например: 47.2.0" value="">
+          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">
+            Оставьте пустым для последней стабильной версии
+          </div>
+        </div>
+        <div class="form-group" id="pf-optifine-group" style="display:none;">
+          <label>Версия OptiFine</label>
+          <input type="text" id="pf-optifine-version" class="input-styled" placeholder="Например: HD_U_I6" value="">
+        </div>
+
         <div class="toggle-group">
           <label>Полноэкранный режим</label>
           <label class="toggle">

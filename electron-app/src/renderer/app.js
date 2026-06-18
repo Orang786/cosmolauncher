@@ -240,6 +240,15 @@ function renderProfiles() {
     return;
   }
 
+  const loaderLabel = p.loader === 'vanilla' ? 'Ванильный' :
+                    p.loader === 'forge' ? 'Forge' :
+                    p.loader === 'fabric' ? 'Fabric' :
+                    p.loader === 'forge+optifine' ? 'Forge+OptiFine' :
+                    p.loader === 'fabric+optifine' ? 'Fabric+OptiFine' : '';
+  if (loaderLabel) {
+    tags += `<span class="pc-tag">⚙️ ${loaderLabel}</span>`;
+  }
+
   grid.innerHTML = profiles.map(p => {
     const isActive = activeProfile?.id === p.id;
     return `
@@ -373,6 +382,11 @@ function openProfileModal(profile) {
   document.getElementById('pf-java').value       = profile?.java || '';
   document.getElementById('pf-fullscreen').checked = profile?.fullscreen || false;
 
+  document.getElementById('pf-loader').value = profile?.loader || 'vanilla';
+  document.getElementById('pf-loader-version').value = profile?.loaderVersion || '';
+  document.getElementById('pf-optifine-version').value = profile?.optifineVersion || '';
+  toggleLoaderFields(document.getElementById('pf-loader').value);
+
   const iconPreview = document.getElementById('pf-icon-preview');
   const selectedIcon = profile?.icon || '🎮';
   iconPreview.textContent = selectedIcon;
@@ -395,6 +409,15 @@ function openProfileModal(profile) {
   document.getElementById('pf-name').focus();
 }
 
+function toggleLoaderFields(loader) {
+  const optifineGroup = document.getElementById('pf-optifine-group');
+  if (loader === 'forge+optifine' || loader === 'fabric+optifine') {
+    optifineGroup.style.display = 'block';
+  } else {
+    optifineGroup.style.display = 'none';
+  }
+}
+
 function closeProfileModal() {
   document.getElementById('profile-modal').classList.remove('show');
   editingProfile = null;
@@ -408,6 +431,9 @@ async function saveProfile() {
   const java       = document.getElementById('pf-java').value.trim();
   const fullscreen = document.getElementById('pf-fullscreen').checked;
   const icon       = document.getElementById('pf-icon-preview').textContent;
+  const loader = document.getElementById('pf-loader').value;
+  const loaderVersion = document.getElementById('pf-loader-version').value.trim();
+  const optifineVersion = document.getElementById('pf-optifine-version').value.trim();
 
   if (!name) {
     showNotif('Введите название профиля', 'error'); return;
@@ -419,13 +445,13 @@ async function saveProfile() {
   if (editingProfile) {
     profiles = profiles.map(p => {
       if (p.id !== editingProfile) return p;
-      return { ...p, icon, name, desc, version, ram, java, fullscreen };
+      return { ...p, icon, name, desc, version, ram, java, fullscreen, loader, loaderVersion, optifineVersion };
     });
     showNotif(`Профиль "${name}" обновлён`, 'success');
   } else {
     const newProfile = {
       id:         generateId(),
-      icon, name, desc, version, ram, java, fullscreen,
+      icon, name, desc, version, ram, java, fullscreen, loader, loaderVersion, optifineVersion,
       createdAt:  Date.now(),
     };
     profiles.push(newProfile);
@@ -475,6 +501,13 @@ async function handleLaunch() {
     await ipcRenderer.invoke('store-get', 'fullscreen') || false;
   const javaPath   = activeProfile?.java ||
     await ipcRenderer.invoke('store-get', 'javaPath') || 'java';
+  const loader = activeProfile?.loader || 'vanilla';
+  const loaderVersion = activeProfile?.loaderVersion || '';
+  const optifineVersion = activeProfile?.optifineVersion || '';
+  const result = await ipcRenderer.invoke('launch-minecraft', {
+    username, version, ram, fullscreen, javaPath,
+    loader, loaderVersion, optifineVersion
+  });
 
   isLaunching = true;
   setLaunchBtnState('loading');
@@ -489,7 +522,7 @@ async function handleLaunch() {
   sessionStartTime = Date.now();
 
   const result = await ipcRenderer.invoke('launch-minecraft', {
-    username, version, ram, fullscreen, javaPath
+    username, version, ram, fullscreen, javaPath, loader, loaderVersion, optifineVersion
   });
 
   if (!result.success) {
