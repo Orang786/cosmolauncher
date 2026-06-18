@@ -76,6 +76,14 @@ async function installForge(minecraftPath, version, loaderVersion, javaPath, onL
     onLog && onLog({ type: 'info', message: `Клиент ${version} уже есть` });
   }
 
+  // Проверяем содержимое папки версии
+  try {
+    const files = fs.readdirSync(versionDir);
+    onLog && onLog({ type: 'info', message: `Содержимое папки ${versionDir}: ${files.join(', ')}` });
+  } catch(e) {
+    onLog && onLog({ type: 'warn', message: `Не удалось прочитать папку версии: ${e.message}` });
+  }
+
   // 2. Определяем версию Forge
   let selectedVersion = loaderVersion;
   if (!selectedVersion || selectedVersion === 'latest') {
@@ -189,6 +197,8 @@ async function installForge(minecraftPath, version, loaderVersion, javaPath, onL
 
   const java = javaPath || 'java';
   const args = [
+    '-Dfml.ignoreInvalidMinecraftCertificates=true',
+    '-Dhttps.protocols=TLSv1.2',
     '-jar', installerPath,
     '--installClient', minecraftPath
   ];
@@ -197,17 +207,17 @@ async function installForge(minecraftPath, version, loaderVersion, javaPath, onL
 
   try {
     const result = await runJava(java, args, { timeout: 180000 });
-    onLog && onLog({ type: 'info', message: result.stdout || 'Forge установлен' });
+    onLog && onLog({ type: 'info', message: 'Forge Installer stdout: ' + (result.stdout || '(empty)') });
     if (result.stderr) {
-      onLog && onLog({ type: 'error', message: result.stderr });
+      onLog && onLog({ type: 'error', message: 'Forge Installer stderr: ' + result.stderr });
       if (result.stderr.includes('ERROR') || result.stderr.includes('Exception')) {
         throw new Error(result.stderr);
       }
     }
   } catch (e) {
     onLog && onLog({ type: 'error', message: `Ошибка установки: ${e.message}` });
-    if (e.stderr) onLog && onLog({ type: 'error', message: `Детали: ${e.stderr}` });
-    if (e.stdout) onLog && onLog({ type: 'info', message: `Вывод: ${e.stdout}` });
+    if (e.stderr) onLog && onLog({ type: 'error', message: `Детали stderr: ${e.stderr}` });
+    if (e.stdout) onLog && onLog({ type: 'info', message: `Вывод stdout: ${e.stdout}` });
     throw new Error(`Не удалось установить Forge: ${e.message}`);
   } finally {
     if (fs.existsSync(installerPath)) {
