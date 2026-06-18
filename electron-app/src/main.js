@@ -360,11 +360,16 @@ ipcMain.handle('download-java', async (_, version, destDir) => {
 
 ipcMain.handle('get-forge-versions', async (_, mcVersion) => {
   try {
-    const url = `https://files.minecraftforge.net/maven/net/minecraftforge/forge/index_${mcVersion}.json`;
+    const url = 'https://files.minecraftforge.net/net/minecraftforge/forge/json';
     const response = await axios.get(url, { timeout: 10000 });
     const data = response.data;
-    const versions = data.number || [];
-    return versions.map(v => ({ version: v }));
+    // data — массив объектов с полями: mcversion, version, ...
+    // Нам нужны версии для конкретной mcversion
+    const versions = data
+      .filter(item => item.mcversion === mcVersion)
+      .map(item => ({ version: item.version }));
+    // Сортируем по возрастанию (можно по дате)
+    return versions;
   } catch (e) {
     console.error('Ошибка получения версий Forge:', e);
     return [];
