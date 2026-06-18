@@ -3,9 +3,7 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 const axios = require('axios');
-const { exec } = require('child_process');
-const { promisify } = require('util');
-const execPromise = promisify(exec);
+const { spawn } = require('child_process');
 
 const launcher = new Client();
 
@@ -20,16 +18,43 @@ function getMinecraftPath() {
   }
 }
 
+// ─── Утилита для запуска Java с аргументами ──────
+function runJava(javaPath, args, options = {}) {
+  return new Promise((resolve, reject) => {
+    const java = javaPath || 'java';
+    const proc = spawn(java, args, {
+      stdio: 'pipe',
+      shell: false,
+      ...options,
+    });
+
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (data) => { stdout += data.toString(); });
+    proc.stderr.on('data', (data) => { stderr += data.toString(); });
+
+    proc.on('close', (code) => {
+      if (code === 0) {
+        resolve({ stdout, stderr });
+      } else {
+        const err = new Error(`Java process exited with code ${code}`);
+        err.stdout = stdout;
+        err.stderr = stderr;
+        reject(err);
+      }
+    });
+    proc.on('error', reject);
+  });
+}
+
 // ─── Установка Forge ──────────────────────────────
 async function installForge(minecraftPath, version, loaderVersion, javaPath, onLog) {
-  // Если loaderVersion не указан или 'latest', пытаемся получить последнюю версию
   let selectedVersion = loaderVersion;
   if (!selectedVersion || selectedVersion === 'latest') {
     onLog && onLog({ type: 'info', message: `Определяем последнюю версию Forge для ${version}...` });
     let versions = [];
     let source = '';
 
-    // Попытка 1: официальный API Forge (иногда не работает)
     try {
       const url = `https://files.minecraftforge.net/maven/net/minecraftforge/forge/index_${version}.json`;
       const response = await axios.get(url, { timeout: 5000 });
@@ -39,8 +64,6 @@ async function installForge(minecraftPath, version, loaderVersion, javaPath, onL
       onLog && onLog({ type: 'info', message: `Получено ${versions.length} версий через ${source}` });
     } catch (e) {
       onLog && onLog({ type: 'warn', message: `Официальный API Forge недоступен: ${e.message}` });
-      
-      // Попытка 2: BMCLAPI (зеркало)
       try {
         const url = `https://bmclapi2.bangbang93.com/forge/minecraft/${version}`;
         const response = await axios.get(url, { timeout: 5000 });
@@ -54,8 +77,6 @@ async function installForge(minecraftPath, version, loaderVersion, javaPath, onL
         }
       } catch (e2) {
         onLog && onLog({ type: 'warn', message: `BMCLAPI недоступен: ${e2.message}` });
-        
-        // Попытка 3: парсинг официальной страницы Forge
         try {
           const url = `https://files.minecraftforge.net/net/minecraftforge/forge/`;
           const response = await axios.get(url, { timeout: 10000 });
@@ -71,8 +92,6 @@ async function installForge(minecraftPath, version, loaderVersion, javaPath, onL
           }
         } catch (e3) {
           onLog && onLog({ type: 'warn', message: `Парсинг страницы Forge не удался: ${e3.message}` });
-          
-          // Попытка 4: встроенный fallback-список
           const fallback = {
             '1.20.4': ['47.2.0', '47.1.3'],
             '1.20.2': ['47.1.0'],
@@ -101,7 +120,6 @@ async function installForge(minecraftPath, version, loaderVersion, javaPath, onL
       throw new Error(`Не найдено ни одной версии Forge для ${version}`);
     }
 
-    // Сортируем версии по убыванию
     versions.sort((a, b) => {
       const partsA = a.split('.').map(Number);
       const partsB = b.split('.').map(Number);
@@ -148,21 +166,21 @@ async function installForge(minecraftPath, version, loaderVersion, javaPath, onL
 
   onLog && onLog({ type: 'info', message: 'Устанавливаем Forge...' });
 
-  // Определяем путь к Java
   const java = javaPath || 'java';
-  // Экранируем пути кавычками для Windows
-  const quotedInstaller = `"${installerPath}"`;
-  const quotedMinecraftPath = `"${minecraftPath}"`;
-  const cmd = `"${java}" -jar ${quotedInstaller} --installClient ${quotedMinecraftPath}`;
-  
-  onLog && onLog({ type: 'debug', message: `Команда: ${cmd}` });
+  const args = [
+    '-jar', installerPath,
+    '--installClient', minecraftPath
+  ];
+
+  onLog && onLog({ type: 'debug', message: `Команда: ${java} ${args.join(' ')}` });
 
   try {
-    const { stdout, stderr } = await execPromise(cmd, { timeout: 120000 });
-    if (stderr) onLog && onLog({ type: 'error', message: stderr });
-    onLog && onLog({ type: 'info', message: stdout || 'Forge установлен' });
+    const result = await runJava(java, args, { timeout: 120000 });
+    onLog && onLog({ type: 'info', message: result.stdout || 'Forge установлен' });
+    if (result.stderr) onLog && onLog({ type: 'error', message: result.stderr });
   } catch (e) {
     onLog && onLog({ type: 'error', message: `Ошибка выполнения: ${e.message}` });
+    onLog && onLog({ type: 'error', message: e.stderr || '' });
     throw new Error(`Не удалось запустить установщик Forge: ${e.message}`);
   } finally {
     if (fs.existsSync(installerPath)) {
@@ -205,15 +223,23 @@ async function installFabric(minecraftPath, version, loaderVersion, javaPath, on
 
   onLog && onLog({ type: 'info', message: 'Устанавливаем Fabric...' });
   const java = javaPath || 'java';
-  const cmd = `"${java}" -jar "${installerPath}" client -dir "${minecraftPath}" -mcversion "${version}" -loader "${loaderVersion}"`;
-  onLog && onLog({ type: 'debug', message: `Команда: ${cmd}` });
+  const args = [
+    '-jar', installerPath,
+    'client',
+    '-dir', minecraftPath,
+    '-mcversion', version,
+    '-loader', loaderVersion
+  ];
+
+  onLog && onLog({ type: 'debug', message: `Команда: ${java} ${args.join(' ')}` });
 
   try {
-    const { stdout, stderr } = await execPromise(cmd, { timeout: 120000 });
-    if (stderr) onLog && onLog({ type: 'error', message: stderr });
-    onLog && onLog({ type: 'info', message: stdout || 'Fabric установлен' });
+    const result = await runJava(java, args, { timeout: 120000 });
+    onLog && onLog({ type: 'info', message: result.stdout || 'Fabric установлен' });
+    if (result.stderr) onLog && onLog({ type: 'error', message: result.stderr });
   } catch (e) {
     onLog && onLog({ type: 'error', message: `Ошибка выполнения: ${e.message}` });
+    onLog && onLog({ type: 'error', message: e.stderr || '' });
     throw new Error(`Не удалось запустить установщик Fabric: ${e.message}`);
   } finally {
     if (fs.existsSync(installerPath)) {
@@ -273,7 +299,6 @@ async function launchMinecraft(options, onLog, onClose) {
   let customArgs = options.customArgs || [];
 
   try {
-    // Установка загрузчиков
     if (loader && loader !== 'vanilla') {
       if (loader === 'forge' || loader === 'forge+optifine') {
         const forgeVersion = await installForge(rootPath, version, loaderVersion || 'latest', javaPath, onLog);
@@ -283,10 +308,8 @@ async function launchMinecraft(options, onLog, onClose) {
         actualVersion = fabricVersion;
       }
 
-      // OptiFine
       if (loader === 'forge+optifine' || loader === 'fabric+optifine') {
         if (loader === 'fabric+optifine') {
-          // OptiFabric
           const optifabricUrl = 'https://maven.terraformersmc.com/releases/net/terraformersmc/optifabric/1.13.24/optifabric-1.13.24.jar';
           const modsDir = path.join(rootPath, 'mods');
           if (!fs.existsSync(modsDir)) fs.mkdirSync(modsDir, { recursive: true });
@@ -317,7 +340,6 @@ async function launchMinecraft(options, onLog, onClose) {
     throw e;
   }
 
-  // Авторизация
   const auth = Authenticator.getAuth(username);
 
   const launchOptions = {
