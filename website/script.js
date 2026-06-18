@@ -3,6 +3,18 @@ const API = 'https://cosmolauncher-api.onrender.com/api';
 // Для локальной разработки:
 // const API = 'http://localhost:3001/api';
 
+const GITHUB_USER = 'Orang786'; // твой никнейм на GitHub
+const GITHUB_REPO = 'cosmolauncher';
+const VERSION     = '1.0.0';
+const GITHUB_BASE = `https://github.com/${GITHUB_USER}/${GITHUB_REPO}/releases/download/v${VERSION}`;
+
+const DOWNLOADS = {
+  'win32':          `${GITHUB_BASE}/CosmoLauncher.Setup.${VERSION}.exe`,
+  'win32-portable': `${GITHUB_BASE}/CosmoLauncher.${VERSION}.exe`,
+  'linux':          `${GITHUB_BASE}/CosmoLauncher-${VERSION}.AppImage`,
+  'darwin':         `${GITHUB_BASE}/CosmoLauncher-${VERSION}.dmg`,
+};
+
 // ─── Cursor glow ───────────────────────────────────
 const cursorGlow = document.getElementById('cursor-glow');
 document.addEventListener('mousemove', e => {
@@ -121,36 +133,21 @@ function setupOSDetection() {
 
 setupOSDetection();
 
-// ─── Download files ─────────────────────────────────
-const DOWNLOADS = {
-  'win32':          `${API.replace('/api','')}/downloads/CosmoLauncher-Setup-1.0.0.exe`,
-  'win32-portable': `${API.replace('/api','')}/downloads/CosmoLauncher-Portable-1.0.0.exe`,
-  'linux':          `${API.replace('/api','')}/downloads/CosmoLauncher-1.0.0.AppImage`,
-  'linux-deb':      `${API.replace('/api','')}/downloads/CosmoLauncher-1.0.0.deb`,
-  'linux-rpm':      `${API.replace('/api','')}/downloads/CosmoLauncher-1.0.0.rpm`,
-  'darwin':         `${API.replace('/api','')}/downloads/CosmoLauncher-1.0.0.dmg`,
-  'darwin-arm':     `${API.replace('/api','')}/downloads/CosmoLauncher-arm64-1.0.0.dmg`,
-};
-
 function downloadFile(platform) {
-  // Получаем актуальный URL с API
-  fetch(`${API}/launcher/latest`)
-    .then(r => r.json())
-    .then(data => {
-      const url = data.downloads?.[platform] || DOWNLOADS[platform];
-      if (url) {
-        showToast('Загрузка началась! ✨', 'success');
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = '';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      }
-    })
-    .catch(() => {
-      showToast('Скоро будет доступно!', 'info');
-    });
+  const url = DOWNLOADS[platform];
+  if (!url) {
+    showToast('Платформа пока не поддерживается', 'info');
+    return;
+  }
+
+  showToast('Загрузка началась! ✨', 'success');
+  const a = document.createElement('a');
+  a.href     = url;
+  a.download = '';
+  a.target   = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 function detectAndDownload() {
