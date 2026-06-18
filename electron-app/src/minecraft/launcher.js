@@ -22,34 +22,26 @@ function getMinecraftPath() {
 function runJava(javaPath, args, options = {}) {
   return new Promise((resolve, reject) => {
     const java = javaPath || 'java';
-    const proc = spawn(java, args, {
-      stdio: 'pipe',
-      shell: false,
-      ...options,
-    });
-
-    let stdout = '';
-    let stderr = '';
-    proc.stdout.on('data', (data) => { stdout += data.toString(); });
-    proc.stderr.on('data', (data) => { stderr += data.toString(); });
-
-    proc.on('close', (code) => {
-      if (code === 0) {
-        resolve({ stdout, stderr });
+    // Используем execFile, чтобы избежать интерпретации shell
+    const { execFile } = require('child_process');
+    const proc = execFile(java, args, {
+      timeout: options.timeout || 120000,
+      windowsHide: true,
+    }, (error, stdout, stderr) => {
+      if (error) {
+        error.stdout = stdout;
+        error.stderr = stderr;
+        reject(error);
       } else {
-        const err = new Error(`Java process exited with code ${code}`);
-        err.stdout = stdout;
-        err.stderr = stderr;
-        reject(err);
+        resolve({ stdout, stderr });
       }
     });
-    proc.on('error', reject);
   });
 }
 
-// ─── Установка Forge ──────────────────────────────
+// ─── Установка Forge (упрощённая, без --noBanners) ──
 async function installForge(minecraftPath, version, loaderVersion, javaPath, onLog) {
-  // Проверка наличия ванильного клиента
+  // 1. Проверяем наличие ванильного клиента
   onLog && onLog({ type: 'info', message: `Проверяем наличие клиента ${version}...` });
   const versionDir = path.join(minecraftPath, 'versions', version);
   const versionJson = path.join(versionDir, `${version}.json`);
@@ -65,6 +57,7 @@ async function installForge(minecraftPath, version, loaderVersion, javaPath, onL
         version: { number: version, type: 'release' },
         memory: { max: '512M', min: '256M' },
         skipLaunch: true,
+        customArgs: []
       });
       onLog && onLog({ type: 'info', message: `Клиент ${version} загружен` });
     } catch (e) {
@@ -75,11 +68,11 @@ async function installForge(minecraftPath, version, loaderVersion, javaPath, onL
     onLog && onLog({ type: 'info', message: `Клиент ${version} уже есть` });
   }
 
-  // Определяем версию Forge
+  // 2. Определяем версию Forge (fallback для надёжности)
   let selectedVersion = loaderVersion;
   if (!selectedVersion || selectedVersion === 'latest') {
     onLog && onLog({ type: 'info', message: `Определяем последнюю версию Forge для ${version}...` });
-    // Используем fallback-список для стабильности
+    // Используем только fallback список, чтобы избежать проблем с API
     const fallback = {
       '1.20.4': ['47.2.0'],
       '1.20.1': ['47.2.0'],
@@ -92,9 +85,26 @@ async function installForge(minecraftPath, version, loaderVersion, javaPath, onL
       '1.12.2': ['14.23.5.2859'],
       '1.8.9': ['11.15.1.2318']
     };
-    const versions = fallback[version] || ['latest'];
-    selectedVersion = versions[0];
-    onLog && onLog({ type: 'info', message: `Выбрана версия Forge: ${selectedVersion}` });
+    if (fallback[version]) {
+      selectedVersion = fallback[version][0];
+      onLog && onLog({ type: 'info', message: `Используем версию Forge: ${selectedVersion}` });
+    } else {
+      // Если нет в списке, пробуем получить через API (но если упадёт, всё равно кидаем ошибку)
+      try {
+        const url = `https://bmclapi2.bangbang93.com/forge/minecraft/${version}`;
+        const response = await axios.get(url, { timeout: 5000 });
+        const rawData = response.data;
+        if (Array.isArray(rawData) && rawData.length > 0) {
+          selectedVersion = rawData[0].version;
+          onLog && onLog({ type: 'info', message: `Получена версия Forge через API: ${selectedVersion}` });
+        } else {
+          throw new Error('Не удалось получить версию');
+        }
+      } catch (e) {
+        onLog && onLog({ type: 'error', message: `Не удалось определить версию Forge для ${version}` });
+        throw new Error(`Нет известных версий Forge для ${version}`);
+      }
+    }
   }
 
   const forgeVersion = `${version}-${selectedVersion}`;
@@ -107,7 +117,7 @@ async function installForge(minecraftPath, version, loaderVersion, javaPath, onL
     return `forge-${forgeVersion}`;
   }
 
-  // Скачиваем инсталлятор
+  // 3. Скачиваем инсталлятор
   onLog && onLog({ type: 'info', message: `Скачиваем Forge ${forgeVersion}...` });
   try {
     const response = await axios({
@@ -127,7 +137,7 @@ async function installForge(minecraftPath, version, loaderVersion, javaPath, onL
     throw new Error(`Не удалось скачать Forge: ${e.message}`);
   }
 
-  // Запускаем установку с минимальными аргументами
+  // 4. Запускаем установку (без лишних опций)
   onLog && onLog({ type: 'info', message: 'Устанавливаем Forge...' });
   const java = javaPath || 'java';
   const args = [
@@ -135,26 +145,19 @@ async function installForge(minecraftPath, version, loaderVersion, javaPath, onL
     '--installClient', minecraftPath
   ];
 
-  // Можно добавить игнорирование ошибок сертификатов (опционально)
-  // args.unshift('-Dfml.ignoreInvalidMinecraftCertificates=true');
-  // args.unshift('-Djava.net.preferIPv4Stack=true');
-
   onLog && onLog({ type: 'debug', message: `Команда: ${java} ${args.join(' ')}` });
 
   try {
-    const { stdout, stderr } = await runJava(java, args, { timeout: 180000 });
-    onLog && onLog({ type: 'info', message: stdout || 'Forge установлен' });
-    if (stderr) {
-      onLog && onLog({ type: 'error', message: stderr });
-      // Если stderr содержит ошибку, пробрасываем
-      if (stderr.includes('ERROR') || stderr.includes('Exception')) {
-        throw new Error(stderr);
-      }
+    const result = await runJava(java, args, { timeout: 180000 });
+    onLog && onLog({ type: 'info', message: result.stdout || 'Forge установлен' });
+    if (result.stderr) {
+      onLog && onLog({ type: 'error', message: result.stderr });
+      // Если stderr содержит ошибку, но код возврата 0, то игнорируем
     }
   } catch (e) {
     onLog && onLog({ type: 'error', message: `Ошибка установки: ${e.message}` });
-    if (e.stderr) onLog && onLog({ type: 'error', message: `Детали: ${e.stderr}` });
     if (e.stdout) onLog && onLog({ type: 'info', message: `Вывод: ${e.stdout}` });
+    if (e.stderr) onLog && onLog({ type: 'error', message: `Детали: ${e.stderr}` });
     throw new Error(`Не удалось установить Forge: ${e.message}`);
   } finally {
     if (fs.existsSync(installerPath)) {
@@ -162,6 +165,7 @@ async function installForge(minecraftPath, version, loaderVersion, javaPath, onL
     }
   }
 
+  // 5. Проверка
   if (!fs.existsSync(forgeDir)) {
     throw new Error(`Forge не был установлен (папка ${forgeDir} не найдена)`);
   }
