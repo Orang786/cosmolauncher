@@ -25,13 +25,20 @@
     </div>
     <div class="window-controls">
       <button class="win-btn minimize" id="btn-minimize">
-        <svg width="12" height="2" viewBox="0 0 12 2"><rect width="12" height="2" fill="currentColor"/></svg>
+        <svg width="12" height="2" viewBox="0 0 12 2">
+          <rect width="12" height="2" fill="currentColor"/>
+        </svg>
       </button>
       <button class="win-btn maximize" id="btn-maximize">
-        <svg width="11" height="11" viewBox="0 0 11 11"><rect x="0.5" y="0.5" width="10" height="10" rx="1" stroke="currentColor" fill="none"/></svg>
+        <svg width="11" height="11" viewBox="0 0 11 11">
+          <rect x="0.5" y="0.5" width="10" height="10" rx="1" stroke="currentColor" fill="none"/>
+        </svg>
       </button>
       <button class="win-btn close" id="btn-close">
-        <svg width="12" height="12" viewBox="0 0 12 12"><line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" stroke-width="1.8"/><line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" stroke-width="1.8"/></svg>
+        <svg width="12" height="12" viewBox="0 0 12 12">
+          <line x1="1" y1="1" x2="11" y2="11" stroke="currentColor" stroke-width="1.8"/>
+          <line x1="11" y1="1" x2="1" y2="11" stroke="currentColor" stroke-width="1.8"/>
+        </svg>
       </button>
     </div>
   </div>
@@ -49,6 +56,15 @@
           </svg>
           <span>Главная</span>
         </button>
+
+        <button class="nav-item" data-page="profiles">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="14" rx="2"/>
+            <path d="M8 21h8M12 17v4"/>
+          </svg>
+          <span>Профили</span>
+        </button>
+
         <button class="nav-item" data-page="versions">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polygon points="12,2 2,7 12,12 22,7"/>
@@ -57,6 +73,7 @@
           </svg>
           <span>Версии</span>
         </button>
+
         <button class="nav-item" data-page="settings">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"/>
@@ -64,6 +81,7 @@
           </svg>
           <span>Настройки</span>
         </button>
+
         <button class="nav-item" data-page="news">
           <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a2 2 0 01-2 2zm0 0a2 2 0 01-2-2v-9c0-1.1.9-2 2-2h2"/>
@@ -84,7 +102,7 @@
     <!-- Content -->
     <main class="content-area">
 
-      <!-- Главная -->
+      <!-- ═══ ГЛАВНАЯ ═══ -->
       <section class="page active" id="page-home">
         <div class="home-hero">
           <div class="hero-content">
@@ -123,6 +141,20 @@
           </div>
         </div>
 
+        <!-- Активный профиль -->
+        <div class="active-profile-bar" id="active-profile-bar">
+          <div class="apb-left">
+            <div class="apb-icon" id="apb-icon">🎮</div>
+            <div class="apb-info">
+              <div class="apb-name" id="apb-name">Стандартный профиль</div>
+              <div class="apb-details" id="apb-details">1.20.4 · 2048 МБ</div>
+            </div>
+          </div>
+          <button class="apb-change" onclick="switchPage('profiles')">
+            Сменить профиль
+          </button>
+        </div>
+
         <!-- Quick Launch -->
         <div class="quick-launch">
           <div class="launch-card">
@@ -156,7 +188,6 @@
               </button>
             </div>
 
-            <!-- Progress -->
             <div class="download-progress" id="download-progress" style="display:none">
               <div class="progress-info">
                 <span id="progress-text">Подготовка...</span>
@@ -169,7 +200,6 @@
           </div>
         </div>
 
-        <!-- Console -->
         <div class="console-section" id="console-section" style="display:none">
           <div class="console-header">
             <span>Консоль</span>
@@ -179,30 +209,41 @@
         </div>
       </section>
 
-      <!-- Версии -->
-      <section class="page" id="page-versions">
-        <h2 class="page-title">Версии Minecraft</h2>
-
-        <div class="versions-search-wrap">
-          <input
-            type="text"
-            id="version-search"
-            class="input-styled"
-            placeholder="🔍 Поиск версии... (например: 1.20)"
-          >
+      <!-- ═══ ПРОФИЛИ ═══ -->
+      <section class="page" id="page-profiles">
+        <div class="profiles-header">
+          <h2 class="page-title">Профили</h2>
+          <button class="btn-create-profile" id="btn-create-profile">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Создать профиль
+          </button>
         </div>
 
+        <div class="profiles-grid" id="profiles-grid">
+          <!-- JS заполнит -->
+        </div>
+      </section>
+
+      <!-- ═══ ВЕРСИИ ═══ -->
+      <section class="page" id="page-versions">
+        <h2 class="page-title">Версии Minecraft</h2>
+        <div class="versions-search-wrap">
+          <input type="text" id="version-search" class="input-styled"
+            placeholder="🔍 Поиск версии... (например: 1.20)">
+        </div>
         <div class="versions-filter">
           <button class="filter-btn active" data-filter="release">Release</button>
           <button class="filter-btn" data-filter="snapshot">Snapshot</button>
           <button class="filter-btn" data-filter="old">Старые</button>
         </div>
-
         <div class="versions-count" id="versions-count"></div>
         <div class="versions-grid" id="versions-grid"></div>
       </section>
 
-      <!-- Настройки -->
+      <!-- ═══ НАСТРОЙКИ ═══ -->
       <section class="page" id="page-settings">
         <h2 class="page-title">Настройки</h2>
         <div class="settings-grid">
@@ -262,10 +303,8 @@
           <div class="settings-card">
             <h3 class="settings-card-title">🖥️ Java и производительность</h3>
             <div class="form-group">
-              <label>Путь к Java (оставьте пустым для авто)</label>
-              <div class="path-input-wrap">
-                <input type="text" id="java-path" class="input-styled" placeholder="java">
-              </div>
+              <label>Путь к Java</label>
+              <input type="text" id="java-path" class="input-styled" placeholder="java">
             </div>
             <div class="form-group">
               <label>ОЗУ по умолчанию</label>
@@ -323,7 +362,7 @@
         </div>
       </section>
 
-      <!-- Новости -->
+      <!-- ═══ НОВОСТИ ═══ -->
       <section class="page" id="page-news">
         <h2 class="page-title">Новости</h2>
         <div class="news-grid" id="news-grid"></div>
@@ -345,6 +384,88 @@
       <div class="modal-buttons">
         <button class="btn-primary" id="offline-confirm">Подтвердить</button>
         <button class="btn-secondary" id="offline-cancel">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модалка создания/редактирования профиля -->
+  <div class="modal-overlay" id="profile-modal">
+    <div class="modal modal-large">
+      <div class="modal-header">
+        <h3 id="profile-modal-title">Создать профиль</h3>
+        <button class="modal-close" id="profile-modal-close">✕</button>
+      </div>
+
+      <div class="profile-form">
+
+        <!-- Иконка профиля -->
+        <div class="pf-icon-picker">
+          <div class="pf-icon-preview" id="pf-icon-preview">🎮</div>
+          <div class="pf-icon-grid">
+            <button class="pf-icon-btn" data-icon="🎮">🎮</button>
+            <button class="pf-icon-btn" data-icon="⚔️">⚔️</button>
+            <button class="pf-icon-btn" data-icon="🏰">🏰</button>
+            <button class="pf-icon-btn" data-icon="🌍">🌍</button>
+            <button class="pf-icon-btn" data-icon="🔥">🔥</button>
+            <button class="pf-icon-btn" data-icon="⚡">⚡</button>
+            <button class="pf-icon-btn" data-icon="🌙">🌙</button>
+            <button class="pf-icon-btn" data-icon="⭐">⭐</button>
+            <button class="pf-icon-btn" data-icon="🎯">🎯</button>
+            <button class="pf-icon-btn" data-icon="🚀">🚀</button>
+            <button class="pf-icon-btn" data-icon="💎">💎</button>
+            <button class="pf-icon-btn" data-icon="🐉">🐉</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Название профиля *</label>
+          <input type="text" id="pf-name" class="input-styled"
+            placeholder="Мой профиль" maxlength="30">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Версия Minecraft *</label>
+            <select id="pf-version" class="select-styled"></select>
+          </div>
+          <div class="form-group">
+            <label>Оперативная память</label>
+            <select id="pf-ram" class="select-styled">
+              <option value="512">512 МБ</option>
+              <option value="1024">1 ГБ</option>
+              <option value="2048" selected>2 ГБ</option>
+              <option value="3072">3 ГБ</option>
+              <option value="4096">4 ГБ</option>
+              <option value="6144">6 ГБ</option>
+              <option value="8192">8 ГБ</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Описание (необязательно)</label>
+          <input type="text" id="pf-desc" class="input-styled"
+            placeholder="Например: для PvP серверов" maxlength="60">
+        </div>
+
+        <div class="form-group">
+          <label>Путь к Java (оставьте пустым для авто)</label>
+          <input type="text" id="pf-java" class="input-styled" placeholder="java">
+        </div>
+
+        <div class="toggle-group">
+          <label>Полноэкранный режим</label>
+          <label class="toggle">
+            <input type="checkbox" id="pf-fullscreen">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="modal-buttons" style="margin-top:20px">
+          <button class="btn-primary" id="pf-save-btn">Сохранить профиль</button>
+          <button class="btn-secondary" id="pf-cancel-btn">Отмена</button>
+        </div>
+
       </div>
     </div>
   </div>
