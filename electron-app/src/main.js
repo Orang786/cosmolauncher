@@ -109,8 +109,18 @@ ipcMain.handle('launch-minecraft', async (_, options) => {
   try {
     await launchMinecraft(
       options,
-      (data) => mainWindow?.webContents.send('minecraft-log', data),
-      (code) => mainWindow?.webContents.send('minecraft-closed', code)
+      (data) => {
+        mainWindow?.webContents.send('minecraft-log', data);
+        
+        // Сообщаем что Minecraft запустился
+        if (data.type === 'debug' && 
+            String(data.message).includes('Launching game')) {
+          mainWindow?.webContents.send('minecraft-launched');
+        }
+      },
+      (code) => {
+        mainWindow?.webContents.send('minecraft-closed', code);
+      }
     );
     return { success: true };
   } catch (err) {
