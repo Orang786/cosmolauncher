@@ -426,16 +426,37 @@
 
           <div class="settings-card">
             <h3 class="settings-card-title">ℹ️ О программе</h3>
+            <div class="current-version-badge">
+              ✦ CosmoLauncher <span id="app-version-display">v1.0.0</span>
+            </div>
             <div class="about-info">
-              <div class="about-row"><span>Версия</span><span>1.0.0</span></div>
-              <div class="about-row"><span>Electron</span><span>v28</span></div>
+              <div class="about-row">
+                <span>Версия</span>
+                <span id="app-version-display-2">1.0.0</span>
+              </div>
+              <div class="about-row">
+                <span>Electron</span>
+                <span>v28</span>
+              </div>
+              <div class="about-row">
+                <span>Платформа</span>
+                <span>Windows</span>
+              </div>
               <div class="about-row">
                 <span>Статус</span>
                 <span class="status-online">● Online</span>
               </div>
             </div>
-            <button class="btn-secondary" id="check-updates-btn" style="margin-top:12px">
-              Проверить обновления
+            <button class="btn-secondary"
+                    id="check-updates-btn"
+                    style="margin-top:12px">
+              🔄 Проверить обновления
+            </button>
+            <button class="btn-secondary"
+                    id="open-game-folder-btn"
+                    style="margin-top:8px"
+                    onclick="ipcRenderer.send('open-minecraft-folder')">
+              📁 Открыть папку игры
             </button>
           </div>
 
@@ -549,6 +570,65 @@
       </div>
     </div>
   </div>
+
+  <!-- Баннер обновления -->
+<div class="update-banner" id="update-banner" style="display:none">
+  <div class="update-banner-content">
+    <div class="update-icon">🔄</div>
+    <div class="update-info">
+      <div class="update-title" id="update-title">
+        Доступно обновление!
+      </div>
+      <div class="update-subtitle" id="update-subtitle">
+        Версия 1.0.1 готова к установке
+      </div>
+    </div>
+    <div class="update-actions">
+      <button class="update-btn-download" id="update-btn-download">
+        Скачать
+      </button>
+      <button class="update-btn-later" id="update-btn-later">
+        Позже
+      </button>
+    </div>
+  </div>
+
+  <!-- Прогресс скачивания -->
+  <div class="update-progress-wrap" id="update-progress-wrap"
+       style="display:none">
+    <div class="update-progress-info">
+      <span id="update-progress-text">Скачивание...</span>
+      <span id="update-progress-percent">0%</span>
+    </div>
+    <div class="update-progress-bar-bg">
+      <div class="update-progress-bar-fill"
+           id="update-progress-bar"></div>
+    </div>
+    <div class="update-speed" id="update-speed"></div>
+  </div>
+</div>
+
+<!-- Модалка готово к установке -->
+<div class="modal-overlay" id="update-ready-modal">
+  <div class="modal">
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="font-size:52px;margin-bottom:12px">✅</div>
+      <h3>Обновление готово!</h3>
+      <p id="update-ready-text">
+        Версия загружена и готова к установке.<br>
+        Лаунчер перезапустится автоматически.
+      </p>
+    </div>
+    <div class="modal-buttons">
+      <button class="btn-primary" id="update-install-btn">
+        Установить сейчас
+      </button>
+      <button class="btn-secondary" id="update-install-later">
+        При следующем запуске
+      </button>
+    </div>
+  </div>
+</div>
 
   <script src="app.js"></script>
 </body>

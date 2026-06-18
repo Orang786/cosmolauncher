@@ -2,6 +2,14 @@ const { ipcRenderer } = require('electron');
 
 const API = 'https://cosmolauncher-api.onrender.com/api';
 
+let appVersion = '1.0.1';
+ipcRenderer.invoke('get-app-version').then(v => {
+  appVersion = v;
+  // Показать версию в настройках
+  const el = document.getElementById('app-version-display');
+  if (el) el.textContent = `v${v}`;
+});
+
 let currentUser    = null;
 let isLaunching    = false;
 let allVersions    = [];
@@ -11,6 +19,107 @@ let activeProfile  = null;
 let editingProfile = null; // ID профиля при редактировании
 
 // ─── Init ─────────────────────────────────────────
+
+// ─── Auto Updater ─────────────────────────────────
+function initUpdater() {
+  const banner      = document.getElementById('update-banner');
+  const title       = document.getElementById('update-title');
+  const subtitle    = document.getElementById('update-subtitle');
+  const btnDownload = document.getElementById('update-btn-download');
+  const btnLater    = document.getElementById('update-btn-later');
+  const progressWrap= document.getElementById('update-progress-wrap');
+  const progressBar = document.getElementById('update-progress-bar');
+  const progressPct = document.getElementById('update-progress-percent');
+  const progressTxt = document.getElementById('update-progress-text');
+  const speedEl     = document.getElementById('update-speed');
+
+  // ── Найдено обновление ──
+  ipcRenderer.on('update-available', (_, info) => {
+    if (!banner) return;
+    if (title)    title.textContent    = `🎉 Доступна версия ${info.version}!`;
+    if (subtitle) subtitle.textContent =
+      `Текущая: v${appVersion} → Новая: v${info.version}`;
+    banner.style.display = 'block';
+  });
+
+  // ── Обновлений нет ──
+  ipcRenderer.on('update-not-available', () => {
+    showNotif('У вас последняя версия лаунчера ✅', 'success');
+  });
+
+  // ── Прогресс скачивания ──
+  ipcRenderer.on('update-download-progress', (_, data) => {
+    if (!progressWrap) return;
+    progressWrap.style.display = 'block';
+    if (progressBar) progressBar.style.width = `${data.percent}%`;
+    if (progressPct) progressPct.textContent = `${data.percent}%`;
+    if (progressTxt) progressTxt.textContent = 'Скачивание обновления...';
+    if (speedEl && data.speed) {
+      speedEl.textContent = `${formatBytes(data.speed)}/с`;
+    }
+  });
+
+  // ── Скачано ──
+  ipcRenderer.on('update-downloaded', (_, info) => {
+    if (banner) banner.style.display = 'none';
+    const modal = document.getElementById('update-ready-modal');
+    const text  = document.getElementById('update-ready-text');
+    if (text) text.innerHTML =
+      `Версия <b>v${info.version}</b> загружена и готова к установке.<br>
+       Лаунчер перезапустится автоматически.`;
+    if (modal) modal.classList.add('show');
+  });
+
+  // ── Ошибка ──
+  ipcRenderer.on('update-error', (_, msg) => {
+    showNotif('Ошибка обновления: ' + msg, 'error');
+    if (btnDownload) {
+      btnDownload.disabled    = false;
+      btnDownload.textContent = 'Повторить';
+    }
+    if (progressWrap) progressWrap.style.display = 'none';
+  });
+
+  // ── Кнопка скачать ──
+  btnDownload?.addEventListener('click', async () => {
+    btnDownload.disabled    = true;
+    btnDownload.textContent = 'Скачиваю...';
+    if (progressWrap) progressWrap.style.display = 'block';
+
+    const result = await ipcRenderer.invoke('update-download');
+    if (!result.success) {
+      showNotif('Ошибка: ' + result.error, 'error');
+      btnDownload.disabled    = false;
+      btnDownload.textContent = 'Повторить';
+      if (progressWrap) progressWrap.style.display = 'none';
+    }
+  });
+
+  // ── Кнопка позже ──
+  btnLater?.addEventListener('click', () => {
+    if (banner) banner.style.display = 'none';
+    showNotif('Обновление будет установлено при следующем запуске', 'info');
+  });
+
+  // ── Установить сейчас ──
+  document.getElementById('update-install-btn')?.addEventListener('click', () => {
+    ipcRenderer.send('update-install');
+  });
+
+  // ── Установить потом ──
+  document.getElementById('update-install-later')?.addEventListener('click', () => {
+    const modal = document.getElementById('update-ready-modal');
+    if (modal) modal.classList.remove('show');
+    showNotif('Обновление установится при следующем запуске', 'info');
+  });
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024)        return bytes + ' Б';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' МБ';
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   initWindowControls();
   initNavigation();
@@ -21,6 +130,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initNewsPage();
   initVersionsPage();
   initProfilesPage();
+  initUpdater(); // ← добавить сюда
 
   await restoreSession();
   await loadVersions();
