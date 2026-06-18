@@ -2,6 +2,9 @@ const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
 const path  = require('path');
 const Store = require('electron-store');
 
+const { exec } = require('child_process');
+const fs = require('fs');
+
 let autoUpdater;
 let log;
 
@@ -127,6 +130,37 @@ function setupUpdaterEvents() {
   });
 }
 
+function findJavaVersions() {
+  return new Promise((resolve) => {
+    const cmd = process.platform === 'win32' 
+      ? 'where java' 
+      : 'which java || update-alternatives --list java || echo ""';
+    
+    exec(cmd, (error, stdout, stderr) => {
+      const paths = stdout.split('\n').filter(p => p.trim() && fs.existsSync(p.trim()));
+      if (paths.length === 0) {
+        resolve([]);
+        return;
+      }
+      // Парсим версию для каждого пути (можно ограничиться первым)
+      const results = [];
+      let pending = paths.length;
+      paths.forEach(jPath => {
+        exec(`"${jPath}" -version 2>&1`, (err, out, stderr2) => {
+          const output = stderr2 || out;
+          const match = output.match(/version "(\d+\.\d+\.\d+[^"]*?)"/) || 
+                        output.match(/version "(\d+)"/);
+          if (match) {
+            results.push({ path: jPath, version: match[1] });
+          }
+          if (--pending === 0) resolve(results);
+        });
+      });
+      if (paths.length === 0) resolve([]);
+    });
+  });
+}
+
 // ─── App Ready ────────────────────────────────────
 app.whenReady().then(() => {
   setupUpdaterEvents();
@@ -163,6 +197,10 @@ ipcMain.handle('launch-minecraft', async (_, options) => {
   } catch (err) {
     return { success: false, error: err.message };
   }
+});
+
+ipcMain.handle('find-java', async () => {
+  return await findJavaVersions();
 });
 
 // ─── IPC — Папки ──────────────────────────────────

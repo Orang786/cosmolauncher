@@ -18,6 +18,8 @@ let profiles       = [];
 let activeProfile  = null;
 let editingProfile = null; // ID профиля при редактировании
 
+const skinCache = {};
+
 // ─── Init ─────────────────────────────────────────
 
 // ─── Auto Updater ─────────────────────────────────
@@ -135,7 +137,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await restoreSession();
   await loadVersions();
   await loadProfiles();
-  updateUI();
+  await updateUI();
 });
 
 // ─── Window ───────────────────────────────────────
@@ -588,6 +590,58 @@ function getDefaultVersions() {
   ];
 }
 
+async function getSkinUrl(username) {
+  if (!username) return null;
+  if (skinCache[username]) return skinCache[username];
+
+  try {
+    // 1. Получить UUID по нику
+    const uuidRes = await fetch(`https://api.mojang.com/users/profiles/minecraft/${username}`);
+    if (!uuidRes.ok) return null;
+    const { id } = await uuidRes.json();
+
+    // 2. Получить профиль с текстурами
+    const profileRes = await fetch(`https://sessionserver.mojang.com/session/minecraft/profile/${id}`);
+    if (!profileRes.ok) return null;
+    const data = await profileRes.json();
+
+    // 3. Распарсить текстуры (base64)
+    const texturesProperty = data.properties.find(p => p.name === 'textures');
+    if (!texturesProperty) return null;
+    const textures = JSON.parse(atob(texturesProperty.value));
+    const skinUrl = textures.textures?.SKIN?.url || null;
+
+    skinCache[username] = skinUrl;
+    return skinUrl;
+  } catch (e) {
+    console.warn('Не удалось получить скин:', e.message);
+    return null;
+  }
+}
+
+function setAvatarImage(url) {
+  const avatarEls = ['profile-avatar', 'user-avatar-big'];
+  avatarEls.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+      el.style.background = 'transparent'; // убираем фон, если был
+    }
+  });
+}
+
+function setAvatarFallback(letter) {
+  const avatarEls = ['profile-avatar', 'user-avatar-big'];
+  avatarEls.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.textContent = letter;
+      el.style.background = ''; // возвращаем стандартный фон (если определён в CSS)
+      el.innerHTML = letter; // очищаем img, если был
+    }
+  });
+}
+
 async function loadVersions() {
   showVersionsLoading();
   try {
@@ -807,7 +861,7 @@ function initAuth() {
     if (uname) {
       currentUser = { username: uname, offline: true };
       await ipcRenderer.invoke('store-set', 'offlineUser', JSON.stringify(currentUser));
-      updateUI();
+      await updateUI();
       showNotif(`Привет, ${uname}! 🎮`, 'success');
       switchPage('home');
     }
@@ -836,7 +890,7 @@ async function handleLogin() {
     await ipcRenderer.invoke('store-set', 'user', JSON.stringify(data.user));
     await ipcRenderer.invoke('store-delete', 'offlineUser');
     await ipcRenderer.invoke('store-delete', 'offlineUsername');
-    updateUI();
+    await updateUI();
     showNotif(`Добро пожаловать, ${data.user.username}! 🎮`, 'success');
     switchPage('home');
   } catch {
@@ -873,7 +927,7 @@ async function handleRegister() {
     await ipcRenderer.invoke('store-set', 'token', data.token);
     await ipcRenderer.invoke('store-set', 'user', JSON.stringify(data.user));
     await ipcRenderer.invoke('store-delete', 'offlineUser');
-    updateUI();
+    await updateUI();
     showNotif(`Добро пожаловать, ${username}! 🎉`, 'success');
     switchPage('home');
   } catch {
@@ -893,7 +947,7 @@ async function handleLogout() {
   const p = document.getElementById('login-password');
   if (e) e.value = '';
   if (p) p.value = '';
-  updateUI();
+  await updateUI();
   showNotif('Вы вышли из аккаунта', 'info');
 }
 
@@ -912,7 +966,7 @@ async function restoreSession() {
         if (d.user) {
           currentUser = d.user;
           await ipcRenderer.invoke('store-set', 'user', JSON.stringify(d.user));
-          updateUI();
+          await updateUI();
         }
       }).catch(() => {});
     } else if (offlineStr) {
@@ -970,6 +1024,26 @@ function initSettings() {
     }
   });
 
+  async function loadJavaInfo() {
+    const javaList = await ipcRenderer.invoke('find-java');
+    const container = document.getElementById('java-detected');
+    if (!container) return;
+    if (javaList.length === 0) {
+      container.innerHTML = '<span style="color:var(--error)">❌ Java не найдена. Установите Java 8 или 17.</span>';
+    } else {
+      container.innerHTML = javaList.map(j => 
+        `<div style="font-size:13px;color:var(--text-secondary)">☕ ${j.path} — версия ${j.version}</div>`
+      ).join('');
+      // Автоматически выбрать первую подходящую (если не задана)
+      const currentJava = await ipcRenderer.invoke('store-get', 'javaPath');
+      if (!currentJava) {
+        const recommended = javaList.find(j => j.version.startsWith('17') || j.version.startsWith('1.8')) || javaList[0];
+        document.getElementById('java-path').value = recommended.path;
+        await ipcRenderer.invoke('store-set', 'javaPath', recommended.path);
+      }
+    }
+  }
+
   // ── Темы ── добавить сюда
   initThemes();
 }
@@ -1025,6 +1099,24 @@ async function loadSavedSettings() {
   if (closeEl) closeEl.checked = close ?? true;
 }
 
+async function getSkinUrl(username) {
+  try {
+    // 1. Получить UUID по нику
+    const res = await fetch(`https://api.mojang.com/users/profiles/minecraft/${username}`);
+    if (!res.ok) return null;
+    const { id } = await res.json();
+    // 2. Получить профиль с текстурами
+    const profileRes = await fetch(`https://sessionserver.mojang.com/session/minecraft/profile/${id}`);
+    if (!profileRes.ok) return null;
+    const data = await profileRes.json();
+    const textures = JSON.parse(atob(data.properties.find(p => p.name === 'textures').value));
+    const skinUrl = textures.textures.SKIN?.url;
+    return skinUrl || null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── News ─────────────────────────────────────────
 function initNewsPage() {
   const newsData = [
@@ -1056,7 +1148,7 @@ function initNewsPage() {
 }
 
 // ─── Update UI ────────────────────────────────────
-function updateUI() {
+async function updateUI() {
   const logged    = !!currentUser;
   const loggedOut = document.getElementById('auth-logged-out');
   const loggedIn  = document.getElementById('auth-logged-in');
@@ -1064,12 +1156,14 @@ function updateUI() {
   if (loggedIn)  loggedIn.style.display  = logged ? 'block' : 'none';
 
   const letter = logged ? currentUser.username[0].toUpperCase() : '?';
+
+  // Сначала устанавливаем текстовые поля (синхронно)
   const els = {
-    'profile-avatar':     letter,
+    'profile-avatar':     letter, // временно, потом обновим
     'profile-name':       logged ? currentUser.username : 'Не войдено',
     'profile-status':     !logged ? 'Нажмите для входа' :
                           currentUser.offline ? 'Оффлайн режим' : 'CosmoLauncher',
-    'user-avatar-big':    letter,
+    'user-avatar-big':    letter, // временно
     'user-name-big':      logged ? currentUser.username : '',
     'user-email-display': logged ? (currentUser.email || 'Оффлайн режим') : '',
   };
@@ -1077,6 +1171,26 @@ function updateUI() {
     const el = document.getElementById(id);
     if (el) el.textContent = val;
   });
+
+  // Теперь обновляем аватар (асинхронно)
+  await updateAvatar();
+}
+
+async function updateAvatar() {
+  if (!currentUser || !currentUser.username) {
+    setAvatarFallback('?');
+    return;
+  }
+
+  // Попытка получить скин
+  const skinUrl = await getSkinUrl(currentUser.username);
+  if (skinUrl) {
+    setAvatarImage(skinUrl);
+  } else {
+    // Если скин не найден — показываем букву
+    const letter = currentUser.username[0].toUpperCase();
+    setAvatarFallback(letter);
+  }
 }
 
 // ─── Helpers ──────────────────────────────────────
